@@ -1,16 +1,14 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using Win32;
+﻿using Win32;
 
 namespace YeahGame;
 
 public class Game
 {
     static Game? singleton;
-
     readonly ConsoleRenderer renderer;
-
     public static ConsoleRenderer Renderer => singleton!.renderer;
+
+    public Player player = new();
 
     public Game()
     {
@@ -25,6 +23,8 @@ public class Game
         ConsoleListener.KeyEvent += Keyboard.Feed;
         ConsoleListener.MouseEvent += Mouse.Feed;
         ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
+
+        ConsoleListener.Start();
 
         while (true)
         {
@@ -42,7 +42,9 @@ public class Game
                 renderer.ClearBuffer();
             }
 
-            renderer[5, 5] = new ConsoleChar('X');
+            player.Update();
+            player.Render();
+
             renderer.Render();
         }
     }
