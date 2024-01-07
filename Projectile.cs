@@ -1,31 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace YeahGame;
 
-namespace YeahGame
+public class Projectile : Entity
 {
-    public class Projectile : Entity
+    public Vector2 Velocity;
+    public  float SpawnedAt;
+
+    public override void Render()
     {
-        public Vector2 Velocity;
-        public  float SpawnedAt;
+        if (!Game.Renderer.IsVisible(Position)) return;
+        Game.Renderer[Position] = (ConsoleChar)'*';
+    }
 
-        public override void Render()
+    public override void Update()
+    {
+        float lifetime = Time.Now - SpawnedAt;
+        if (lifetime > 5)
         {
-            if (!Game.Renderer.IsVisible(Position)) return;
-            Game.Renderer[Position] = (ConsoleChar)'*';
+            DoesExist = false;
+            return;
         }
-
-        public override void Update()
-        {
-            float lifetime = Time.Now - SpawnedAt;
-            if (lifetime > 5)
-            {
-                DoesExist = false;
-                return;
-            }
-            Position += Velocity * Time.Delta;
-        }
+        Position += Velocity * Time.Delta;
     }
 }
