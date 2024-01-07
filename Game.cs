@@ -6,7 +6,11 @@ public class Game
     readonly ConsoleRenderer renderer;
     public static ConsoleRenderer Renderer => singleton!.renderer;
 
+    public static Game Singleton => singleton!;
+
     public Player player = new();
+
+    public List<Projectile> projectiles = new();
 
     public Game()
     {
@@ -23,7 +27,7 @@ public class Game
         ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
 
         ConsoleListener.Start();
-
+        ConsoleHandler.Setup();
         while (true)
         {
             Time.Tick();
@@ -41,6 +45,21 @@ public class Game
             }
 
             player.Update();
+            for (int i = projectiles.Count - 1; i >= 0; i--)
+            {
+                Projectile currentProjectile = projectiles[i];
+                currentProjectile.Update();
+                if (currentProjectile.DoesExist != true)
+                {
+                    projectiles.RemoveAt(i);
+                }
+            }
+
+            for (int i = 0; i < projectiles.Count; i++)
+            {
+                projectiles[i].Render();
+            }
+
             player.Render();
 
             renderer.Render();

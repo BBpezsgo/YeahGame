@@ -1,10 +1,10 @@
 ﻿namespace YeahGame
 {
-    public class Player
+    public class Player : Entity
     {
-        public Vector2 Position;
+        
 
-        public void Update()
+        public override void Update()
         {
             if (Keyboard.IsKeyPressed('W'))
             {
@@ -22,10 +22,25 @@
             {
                 Position.X += 10 * Time.Delta;
             }
+            Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
+            Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
+
+            if (Mouse.IsPressed(MouseButton.Left))
+            {
+                Vector2 velocity = Mouse.RecordedConsolePosition - Position;
+                velocity = Vector2.Normalize(velocity);
+                velocity *= 15;
+                Projectile newProjectile = new();
+                newProjectile.Position = Position;
+                newProjectile.Velocity = velocity;
+                newProjectile.SpawnedAt = Time.Now;
+                Game.Singleton.projectiles.Add(newProjectile);
+            }
         }
 
-        public void Render()
+        public override void Render()
         {
+            if (!Game.Renderer.IsVisible(Position)) return;
             Game.Renderer[Position] = (ConsoleChar)'○';
         }
     }    
