@@ -1,7 +1,4 @@
-﻿using System.Numerics;
-using Win32;
-
-namespace YeahGame
+﻿namespace YeahGame
 {
     public class Player
     {

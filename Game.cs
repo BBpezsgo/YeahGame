@@ -1,6 +1,4 @@
-﻿using Win32;
-
-namespace YeahGame;
+﻿namespace YeahGame;
 
 public class Game
 {

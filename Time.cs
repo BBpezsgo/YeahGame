@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace YeahGame;
+﻿namespace YeahGame;
 
 public static class Time
 {
