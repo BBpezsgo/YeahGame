@@ -2,8 +2,10 @@
 
 public class Projectile : Entity
 {
+    public const float Speed = 25f;
+
     public Vector2 Velocity;
-    public  float SpawnedAt;
+    public float SpawnedAt;
 
     public override void Render()
     {

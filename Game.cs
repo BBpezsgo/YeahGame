@@ -3,19 +3,22 @@
 public class Game
 {
     static Game? singleton;
+    public static Game Singleton => singleton!;
+
     readonly ConsoleRenderer renderer;
     public static ConsoleRenderer Renderer => singleton!.renderer;
 
-    public static Game Singleton => singleton!;
+    public Connection Connection;
 
     public Player player = new();
-
     public List<Projectile> projectiles = new();
 
     public Game()
     {
-        renderer = new ConsoleRenderer();
         singleton = this;
+        renderer = new ConsoleRenderer();
+        
+        Connection = new Connection();
     }
 
     public void Start()
@@ -28,6 +31,7 @@ public class Game
 
         ConsoleListener.Start();
         ConsoleHandler.Setup();
+
         while (true)
         {
             Time.Tick();
