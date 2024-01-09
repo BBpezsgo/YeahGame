@@ -5,7 +5,7 @@ public enum MessageType : byte
     CONTROL = 1,
 }
 
-public abstract class Message : ISerializable<Message>
+public abstract class Message : ISerializable
 {
     public MessageType Type;
 

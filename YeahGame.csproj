@@ -27,6 +27,9 @@
 
   <ItemGroup>
     <Using Include="System.Numerics" />
+    <Using Include="System.Threading.Thread">
+      <Alias>Thread</Alias>
+    </Using>
     <Using Include="Win32" />
   </ItemGroup>
 

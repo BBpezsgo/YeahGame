@@ -4,9 +4,12 @@ public enum NetControlMessageKind : byte
 {
     HEY_IM_CLIENT_PLS_REPLY,
     HEY_CLIENT_IM_SERVER,
+    IM_THERE,
+    PING,
+    PONG,
 }
 
-public class NetControlMessage : Message, ISerializable<NetControlMessage>
+public class NetControlMessage : Message
 {
     public NetControlMessageKind Kind;
 

@@ -1,190 +1,236 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO.Pipelines;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using YeahGame.Messages;
-using Thread = System.Threading.Thread;
+
+using UdpMessage = (byte[] Buffer, System.Net.IPEndPoint Source);
 
 namespace YeahGame;
 
-class UdpClient
-{
-    public readonly Pipe Pipe;
-    public readonly ConcurrentQueue<byte[]> IncomingQueue;
-    public readonly IPEndPoint RemoteEndPoint;
-    public bool IsAlive;
-    public readonly bool DebugLog;
-
-    readonly Thread ListeningThread;
-
-    public UdpClient(UdpReceiveResult udpReceiveResult, bool debugLog = false)
-    {
-        Pipe = new Pipe();
-        RemoteEndPoint = udpReceiveResult.RemoteEndPoint;
-        IsAlive = true;
-        IncomingQueue = new ConcurrentQueue<byte[]>();
-        ListeningThread = new Thread(Listen);
-        ListeningThread.Start();
-        DebugLog = debugLog;
-    }
-
-    async void Listen()
-    {
-        if (DebugLog) Debug.WriteLine($"[Net]: Listening for {RemoteEndPoint} ...");
-        while (IsAlive)
-        {
-            ReadResult readResult = await Pipe.Reader.ReadAsync();
-            if (!IsAlive) break;
-            IncomingQueue.Enqueue(readResult.Buffer.FirstSpan.ToArray());
-            Pipe.Reader.AdvanceTo(readResult.Buffer.End);
-        }
-        if (DebugLog) Debug.WriteLine($"[Net]: Listening for {RemoteEndPoint} aborted");
-    }
-
-    public void Dispose()
-    {
-        IsAlive = false;
-    }
-}
-
 public class Connection
 {
-    readonly ConcurrentQueue<UdpReceiveResult> IncomingQueue = new();
-    readonly Queue<Message> OutgoingQueue = new();
+    #region Types'n Stuff
 
-    System.Net.Sockets.UdpClient? UdpSocket = null;
+    class UdpClient
+    {
+        public readonly ConcurrentQueue<byte[]> IncomingQueue;
+        public readonly IPEndPoint EndPoint;
+
+        public double ReceivedAt;
+        public double SentAt;
+
+        public UdpClient(IPEndPoint endPoint)
+        {
+            IncomingQueue = new ConcurrentQueue<byte[]>();
+            EndPoint = endPoint;
+
+            ReceivedAt = Time.NowNoCache;
+            SentAt = Time.NowNoCache;
+        }
+    }
+
+    public enum ConnectingPhase
+    {
+        Connected,
+        Handshake,
+    }
+
+    public delegate void ClientConnectedEventHandler(IPEndPoint client, ConnectingPhase phase);
+    public delegate void ClientDisconnectedEventHandler(IPEndPoint client);
+    public delegate void ConnectedToServerEventHandler(ConnectingPhase phase);
+    public delegate void DisconnectedFromServerEventHandler();
+
+    #endregion
+
+    readonly ConcurrentQueue<UdpMessage> IncomingQueue;
+    readonly Queue<Message> OutgoingQueue;
+
+    public event ClientConnectedEventHandler? OnClientConnected;
+    public event ClientDisconnectedEventHandler? OnClientDisconnected;
+    public event ConnectedToServerEventHandler? OnConnectedToServer;
+    public event DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
+
+    readonly ConcurrentDictionary<string, UdpClient> Connections;
+
+    [MemberNotNullWhen(true, nameof(UdpSocket))]
+    public bool IsConnected => UdpSocket != null;
+
+    public IPEndPoint? ServerAddress => (!IsConnected || isServer) ? null : (IPEndPoint?)UdpSocket.Client.RemoteEndPoint;
+
+    public bool IsServer => isServer;
+
+    public IReadOnlyList<IPEndPoint> Clients => Connections.Values
+        .Select(client => client.EndPoint)
+        .ToList();
+
+    public double ReceivedAt;
+    public double SentAt;
+
+    System.Net.Sockets.UdpClient? UdpSocket;
     readonly Thread ListeningThread;
-    bool IsServer;
+    bool isServer;
 
     bool ShouldListen;
 
-    readonly ConcurrentDictionary<string, UdpClient> Connections = new();
-
-    bool ConnectedToServer;
-
     public Connection()
     {
+        IncomingQueue = new ConcurrentQueue<UdpMessage>();
+        OutgoingQueue = new Queue<Message>();
+
+        Connections = new ConcurrentDictionary<string, UdpClient>();
+
         ListeningThread = new Thread(Listen);
     }
 
+    #region UDP Stuff
+
     public void Client(IPAddress address, int port)
     {
-        IsServer = false;
+        isServer = false;
         UdpSocket = new System.Net.Sockets.UdpClient();
         UdpSocket.Connect(address, port);
         ShouldListen = true;
         ListeningThread.Start();
+        OnConnectedToServer?.Invoke(ConnectingPhase.Connected);
+        ReceivedAt = Time.NowNoCache;
+        SentAt = Time.NowNoCache;
         Send(new NetControlMessage(NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY));
     }
 
     public void Server(IPAddress address, int port)
     {
-        IsServer = true;
+        isServer = true;
         UdpSocket = new System.Net.Sockets.UdpClient(new IPEndPoint(address, port));
         ShouldListen = true;
         ListeningThread.Start();
+        ReceivedAt = Time.NowNoCache;
+        SentAt = Time.NowNoCache;
     }
 
-    async void Listen()
+    void Listen()
     {
-        if (UdpSocket == null) return;
+        if (!IsConnected) return;
 
         while (ShouldListen)
         {
             try
             {
-                UdpReceiveResult result = await UdpSocket.ReceiveAsync();
+                IPEndPoint source = new(IPAddress.Any, 0);
+                byte[] buffer = UdpSocket.Receive(ref source);
 
                 if (!ShouldListen) break;
 
-                if (IsServer)
+                ReceivedAt = Time.NowNoCache;
+
+                if (isServer)
                 {
-                    if (Connections.TryGetValue(result.RemoteEndPoint.ToString(), out UdpClient? client))
+                    if (!Connections.TryGetValue(source.ToString(), out UdpClient? client))
                     {
-                        await client.Pipe.Writer.WriteAsync(result.Buffer);
+                        client = new UdpClient(source);
+                        Connections.TryAdd(source.ToString(), client);
+                        OnClientConnected?.Invoke(source, ConnectingPhase.Connected);
                     }
-                    else
-                    {
-                        UdpClient newClient = new(result);
-                        Connections.TryAdd(result.RemoteEndPoint.ToString(), new UdpClient(result));
 
-                        await newClient.Pipe.Writer.WriteAsync(result.Buffer);
-
-                        Console.WriteLine($"Client {result.RemoteEndPoint} connected");
-                    }
+                    client.IncomingQueue.Enqueue(buffer);
                 }
                 else
                 {
-                    ConnectedToServer = true;
+                    IncomingQueue.Enqueue(new UdpMessage(buffer, source));
                 }
-
-                IncomingQueue.Enqueue(result);
             }
-            catch (SocketException)
-            { break; }
+            catch (SocketException ex)
+            {
+                Close();
+                Debug.WriteLine($"[Net]: Error ({ex.ErrorCode}) ({ex.NativeErrorCode}) ({ex.SocketErrorCode}): {ex.Message}");
+                break;
+            }
         }
     }
 
     public void Close()
     {
         ShouldListen = false;
-        foreach (KeyValuePair<string, UdpClient> client in Connections)
-        {
-            client.Value.Dispose();
-        }
+        Connections.Clear();
         UdpSocket?.Close();
         UdpSocket?.Dispose();
+        UdpSocket = null;
+
+        if (!isServer)
+        { OnDisconnectedFromServer?.Invoke(); }
     }
 
-    public void Receive()
+    #endregion
+
+    #region Message Handling
+
+    public void Tick()
     {
-        while (IncomingQueue.TryDequeue(out UdpReceiveResult messageIn))
-        {
-            OnReceiveInternal(messageIn.RemoteEndPoint, messageIn.Buffer);
-        }
+        while (IncomingQueue.TryDequeue(out UdpMessage messageIn))
+        { OnReceiveInternal(messageIn.Source, messageIn.Buffer); }
 
         while (OutgoingQueue.TryDequeue(out Message? messageOut))
-        {
-            SendImmediate(messageOut);
-        }
+        { SendImmediate(messageOut); }
 
         List<string> shouldRemove = new();
 
         foreach (KeyValuePair<string, UdpClient> client in Connections)
         {
-            if (!client.Value.IsAlive)
+            while (client.Value.IncomingQueue.TryDequeue(out byte[]? messageIn))
             {
+                OnReceiveInternal(client.Value.EndPoint, messageIn);
+            }
+
+            if (Time.NowNoCache - client.Value.ReceivedAt > 5d &&
+                Time.NowNoCache - client.Value.SentAt > 5d)
+            {
+                Debug.WriteLine($"[Net]: =={client.Value.EndPoint}=> PING");
+                SendSendImmediateTo(new NetControlMessage(NetControlMessageKind.PING), client.Value.EndPoint);
+            }
+
+            if (Time.NowNoCache - client.Value.ReceivedAt > 10d)
+            {
+                Debug.WriteLine($"[Net]: Kicking client {client.Value.EndPoint} for idling too long");
                 shouldRemove.Add(client.Key);
                 continue;
             }
-
-            while (client.Value.IncomingQueue.TryDequeue(out byte[]? _message))
-            {
-                OnReceiveInternal(client.Value.RemoteEndPoint, _message);
-            }
         }
 
-        for (int i = shouldRemove.Count - 1; i >= 0; i--)
+        for (int i = 0; i < shouldRemove.Count; i++)
         {
             if (Connections.TryRemove(shouldRemove[i], out UdpClient? removedClient))
-            { removedClient?.Dispose(); }
+            { OnClientDisconnected?.Invoke(removedClient.EndPoint); }
+        }
+
+        if (!isServer && IsConnected)
+        {
+            if (Time.NowNoCache - ReceivedAt > 5d &&
+                Time.NowNoCache - SentAt > 5d)
+            {
+                Debug.WriteLine($"[Net]: =={ServerAddress}=> PING");
+                SendImmediate(new NetControlMessage(NetControlMessageKind.PING));
+            }
+
+            if (Time.NowNoCache - ReceivedAt > 10d && ShouldListen)
+            {
+                Debug.WriteLine($"[Net]: Server idling too long, disconnecting");
+                Close();
+            }
         }
     }
 
     void OnReceiveInternal(IPEndPoint source, byte[] buffer)
     {
-        Console.WriteLine($"Received {buffer.Length} bytes from {source}");
         if (buffer.Length == 0) return;
+
         MessageType messageType = (MessageType)buffer[0];
-        using MemoryStream stream = new(buffer);
-        using BinaryReader reader = new(stream);
+
         switch (messageType)
         {
             case MessageType.CONTROL:
             {
-                NetControlMessage message = new();
-                message.Deserialize(reader);
+                NetControlMessage message = Utils.Deserialize<NetControlMessage>(buffer);
                 FeedControlMessage(source, message);
                 break;
             }
@@ -193,68 +239,108 @@ public class Connection
         }
     }
 
-    protected void Send(byte[] data)
-    {
-        if (UdpSocket == null) return;
+    #endregion
 
-        if (IsServer)
+    void FeedControlMessage(IPEndPoint source, NetControlMessage netControlMessage)
+    {
+        if (!IsConnected) return;
+
+        if (Connections.TryGetValue(source.ToString(), out UdpClient? client))
+        { client.ReceivedAt = Time.NowNoCache; }
+
+        switch (netControlMessage.Type)
+        {
+            case MessageType.CONTROL:
+            {
+                switch (netControlMessage.Kind)
+                {
+                    case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
+                    {
+                        SendSendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
+                        OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
+                        return;
+                    }
+                    case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
+                    {
+                        OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
+                        return;
+                    }
+                    case NetControlMessageKind.IM_THERE:
+                    {
+                        return;
+                    }
+                    case NetControlMessageKind.PING:
+                    {
+                        Debug.WriteLine($"[Net]: =={source}=> PONG");
+                        SendSendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
+                        return;
+                    }
+                    case NetControlMessageKind.PONG:
+                    {
+                        Debug.WriteLine($"[Net]: <={source}== PONG");
+                        return;
+                    }
+                    default: return;
+                }
+            }
+            default:
+                break;
+        }
+    }
+
+    #region Message Sending
+
+    public void SendImmediate<T>(T data) where T : ISerializable
+        => SendImmediate(Utils.Serialize(data));
+
+    public void SendImmediate(byte[] data)
+    {
+        if (!IsConnected) return;
+
+        SentAt = Time.NowNoCache;
+        if (isServer)
         {
             foreach (KeyValuePair<string, UdpClient> client in Connections)
             {
-                Console.WriteLine($"Send {data.Length} bytes to client {client.Value.RemoteEndPoint}");
-                UdpSocket.Send(data, data.Length, client.Value.RemoteEndPoint);
+                UdpSocket.Send(data, data.Length, client.Value.EndPoint);
             }
         }
         else
         {
-                Console.WriteLine($"Send {data.Length} bytes to sever");
             UdpSocket.Send(data, data.Length);
         }
     }
 
-    protected void SendTo(byte[] data, IPEndPoint destination)
+    public void SendSendImmediateTo<T>(T data, IPEndPoint destination) where T : ISerializable
+        => SendSendImmediateTo(Utils.Serialize(data), destination);
+
+    public void SendSendImmediateTo(byte[] data, IPEndPoint destination)
     {
-        if (UdpSocket == null) return;
-        if (!IsServer) return;
+        if (!IsConnected) return;
 
-        foreach (KeyValuePair<string, UdpClient> client in Connections)
+        SentAt = Time.NowNoCache;
+        if (isServer)
         {
-            if (!client.Value.RemoteEndPoint.Equals(destination)) continue;
-
-            UdpSocket.Send(data, data.Length, client.Value.RemoteEndPoint);
-
-            break;
-        }
-    }
-
-    public void FeedControlMessage(IPEndPoint source, NetControlMessage netControlMessage)
-    {
-        if (UdpSocket == null) return;
-
-        if (netControlMessage.Type == MessageType.CONTROL)
-        {
-            switch (netControlMessage.Kind)
+            foreach (KeyValuePair<string, UdpClient> client in Connections)
             {
-                case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
-                {
-                    Console.WriteLine("Received PLS message");
-                    SendTo(Utils.Serialize(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER)), source);
-                    return;
-                }
-                case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
-                {
-                    Console.WriteLine("Received HEY message");
-                    ConnectedToServer = true;
-                    return;
-                }
-                default: return;
+                if (!client.Value.EndPoint.Equals(destination)) continue;
+
+                UdpSocket.Send(data, data.Length, client.Value.EndPoint);
+                client.Value.SentAt = Time.NowNoCache;
+
+                break;
+            }
+        }
+        else
+        {
+            if (UdpSocket.Client.RemoteEndPoint?.ToString() == destination.ToString())
+            {
+                UdpSocket.Send(data, data.Length);
             }
         }
     }
 
-    public void Dispose() => UdpSocket?.Dispose();
-
     public void Send(Message message) => OutgoingQueue.Enqueue(message);
 
-    public void SendImmediate(Message message) => Send(Utils.Serialize(message));
+    #endregion
 }

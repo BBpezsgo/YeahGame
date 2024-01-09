@@ -2,16 +2,18 @@
 
 public static class Time
 {
-    static float lastTime;
-    static float now;
-    static float deltaTime;
+    static double lastTime;
+    static double now;
+    static double deltaTime;
 
-    public static float Now => now;
-    public static float Delta => deltaTime;
+    public static float Now => (float)now;
+    public static float Delta => (float)deltaTime;
+
+    public static double NowNoCache => DateTime.UtcNow.TimeOfDay.TotalSeconds;
 
     public static void Tick()
     {
-        now = (float)DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
         deltaTime = now - lastTime;
         lastTime = now;
     }
