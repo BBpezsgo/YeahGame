@@ -1,4 +1,6 @@
-﻿using YeahGame.Messages;
+﻿using System;
+using YeahGame.Messages;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace YeahGame;
 
@@ -46,6 +48,20 @@ public class Player : NetworkEntity
 
                 LastShot = Time.Now;
             }
+            using MemoryStream stream = new();
+            BinaryWriter writer = new(stream);
+            writer.Write(Position.X);
+            writer.Write(Position.Y);
+            writer.Flush();
+            writer.Close();
+
+
+            Game.Singleton.Connection.Send(new ObjectMessage()
+            {
+                Details = stream.ToArray(),
+                Type = MessageType.Object,
+                ObjectId = NetworkId
+            });
         }
     }
 
@@ -57,16 +73,20 @@ public class Player : NetworkEntity
 
     public override void HandleMessage(ObjectMessage message)
     {
-
+        using MemoryStream stream = new(message.Details);
+        using BinaryReader reader = new(stream);
+        Position.X = reader.ReadSingle();
+        Position.Y = reader.ReadSingle();
     }
 
     public override void NetworkSerialize(BinaryWriter writer)
     {
+        writer.Write(Owner ?? string.Empty);
 
     }
 
     public override void NetworkDeserialize(BinaryReader reader)
     {
-
+        Owner = reader.ReadString();
     }
 }
