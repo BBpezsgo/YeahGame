@@ -14,6 +14,16 @@ public static partial class Utils
         return stream.ToArray();
     }
 
+    public static byte[] Serialize(Action<BinaryWriter> serializer)
+    {
+        using MemoryStream stream = new();
+        BinaryWriter writer = new(stream);
+        serializer.Invoke(writer);
+        writer.Flush();
+        writer.Close();
+        return stream.ToArray();
+    }
+
     public static T Deserialize<T>(T data, byte[] buffer) where T : ISerializable
     {
         using MemoryStream stream = new(buffer);
@@ -22,8 +32,31 @@ public static partial class Utils
         return data;
     }
 
+    public static T Deserialize<T>(T data, BinaryReader reader) where T : ISerializable
+    {
+        data.Deserialize(reader);
+        return data;
+    }
+
+    public static T Deserialize<T>(T data, Action<T, BinaryReader> deserializer, byte[] buffer)
+    {
+        using MemoryStream stream = new(buffer);
+        using BinaryReader reader = new(stream);
+        deserializer.Invoke(data, reader);
+        return data;
+    }
+
+    public static T Deserialize<T>(T data, Action<T, BinaryReader> deserializer, BinaryReader reader)
+    {
+        deserializer.Invoke(data, reader);
+        return data;
+    }
+
     public static T Deserialize<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(byte[] buffer) where T : ISerializable
         => Utils.Deserialize(Activator.CreateInstance<T>(), buffer);
+
+    public static T Deserialize<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(BinaryReader reader) where T : ISerializable
+        => Utils.Deserialize(Activator.CreateInstance<T>(), reader);
 }
 
 public static class Extensions

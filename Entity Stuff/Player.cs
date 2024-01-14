@@ -34,6 +34,7 @@ public class Player : NetworkEntity
                 Time.Now - LastShot > 0.5f)
             {
                 Vector2 velocity = Mouse.RecordedConsolePosition - Position;
+                velocity *= new Vector2(1f, 2f);
                 velocity = Vector2.Normalize(velocity);
                 velocity *= Projectile.Speed;
                 velocity *= new Vector2(1, 0.5f);
@@ -48,21 +49,27 @@ public class Player : NetworkEntity
 
                 LastShot = Time.Now;
             }
-            using MemoryStream stream = new();
-            BinaryWriter writer = new(stream);
+
+            Sync();
+        }
+    }
+
+    void Sync()
+    {
+        if (!Game.Singleton.ShouldSync)
+        { return; }
+
+        byte[] data = Utils.Serialize(writer =>
+        {
             writer.Write(Position.X);
             writer.Write(Position.Y);
-            writer.Flush();
-            writer.Close();
+        });
 
-
-            Game.Singleton.Connection.Send(new ObjectMessage()
-            {
-                Details = stream.ToArray(),
-                Type = MessageType.Object,
-                ObjectId = NetworkId
-            });
-        }
+        Game.Singleton.Connection.Send(new ObjectSyncMessage()
+        {
+            Details = data,
+            ObjectId = NetworkId,
+        });
     }
 
     public override void Render()
@@ -71,7 +78,7 @@ public class Player : NetworkEntity
         Game.Renderer[Position] = (ConsoleChar)'○';
     }
 
-    public override void HandleMessage(ObjectMessage message)
+    public override void HandleMessage(ObjectSyncMessage message)
     {
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);
@@ -81,8 +88,7 @@ public class Player : NetworkEntity
 
     public override void NetworkSerialize(BinaryWriter writer)
     {
-        writer.Write(Owner ?? string.Empty);
-
+        writer.Write(Owner!);
     }
 
     public override void NetworkDeserialize(BinaryReader reader)

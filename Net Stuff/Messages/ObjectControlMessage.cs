@@ -6,22 +6,22 @@ public enum ObjectControlMessageKind : byte
     /// <summary>
     /// Server -> Client
     /// </summary>
-    Spawn,
+    Spawn = 1,
 
     /// <summary>
     /// Server -> Client
     /// </summary>
-    Destroy,
+    Destroy = 2,
 
     /// <summary>
     /// Client -> Server
     /// </summary>
-    NotFound,
+    NotFound = 3,
 
     /// <summary>
     /// Server -> Client
     /// </summary>
-    Info,
+    Info = 4,
 }
 
 public class ObjectControlMessage : Message
@@ -30,6 +30,8 @@ public class ObjectControlMessage : Message
     public int ObjectId;
     public EntityPrototype EntityPrototype;
     public byte[] Details = Array.Empty<byte>();
+
+    public ObjectControlMessage() : base(MessageType.ObjectControl) { }
 
     public override void Deserialize(BinaryReader reader)
     {
@@ -50,4 +52,13 @@ public class ObjectControlMessage : Message
         writer.Write(Details.Length);
         writer.Write(Details);
     }
+
+    public override string ToString() => Kind switch
+    {
+        ObjectControlMessageKind.Spawn => $"{{ {Kind} {EntityPrototype} {ObjectId} }} {base.ToString()}",
+        ObjectControlMessageKind.Destroy => $"{{ {Kind} {ObjectId} }} {base.ToString()}",
+        ObjectControlMessageKind.NotFound => $"{{ {Kind} {ObjectId} }} {base.ToString()}",
+        ObjectControlMessageKind.Info => $"{{ {Kind} {EntityPrototype} {ObjectId} }} {base.ToString()}",
+        _ => throw new NotImplementedException(),
+    };
 }

@@ -1,10 +1,12 @@
 ﻿
 namespace YeahGame.Messages;
 
-public class ObjectMessage : Message
+public class ObjectSyncMessage : Message
 {
     public int ObjectId;
     public byte[] Details = Array.Empty<byte>();
+
+    public ObjectSyncMessage() : base(MessageType.ObjectSync) { }
 
     public override void Deserialize(BinaryReader reader)
     {
@@ -12,7 +14,6 @@ public class ObjectMessage : Message
         ObjectId = reader.ReadInt32();
         int detailsLength = reader.ReadInt32();
         Details = reader.ReadBytes(detailsLength);
-
     }
 
     public override void Serialize(BinaryWriter writer)
@@ -22,4 +23,6 @@ public class ObjectMessage : Message
         writer.Write(Details.Length);
         writer.Write(Details);
     }
+
+    public override string ToString() => $"{{ {ObjectId} }} {base.ToString()}";
 }

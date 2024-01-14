@@ -3,21 +3,28 @@
 public enum MessageType : byte
 {
     Control = 1,
-    Object = 2,
+    ObjectSync = 2,
     ObjectControl = 3,
 }
 
 public abstract class Message : ISerializable
 {
-    public MessageType Type;
+    MessageType _type;
+
+    public MessageType Type => _type;
+
+    public Message() { }
+    protected Message(MessageType type) => _type = type;
 
     public virtual void Serialize(BinaryWriter writer)
     {
-        writer.Write((byte)Type);
+        writer.Write((byte)_type);
     }
 
     public virtual void Deserialize(BinaryReader reader)
     {
-        Type = (MessageType)reader.ReadByte();
+        _type = (MessageType)reader.ReadByte();
     }
+
+    public override string ToString() => $"{{ {_type} }}";
 }
