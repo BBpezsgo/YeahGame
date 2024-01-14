@@ -41,6 +41,7 @@ public class Connection
     public delegate void ClientDisconnectedEventHandler(IPEndPoint client);
     public delegate void ConnectedToServerEventHandler(ConnectingPhase phase);
     public delegate void DisconnectedFromServerEventHandler();
+    public delegate void MessageReceivedEventHandler(Message message, IPEndPoint source);
 
     #endregion
 
@@ -51,6 +52,7 @@ public class Connection
     public event ClientDisconnectedEventHandler? OnClientDisconnected;
     public event ConnectedToServerEventHandler? OnConnectedToServer;
     public event DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
+    public event MessageReceivedEventHandler? OnMessageReceived;
 
     readonly ConcurrentDictionary<string, UdpClient> Connections;
 
@@ -58,6 +60,7 @@ public class Connection
     public bool IsConnected => UdpSocket != null;
 
     public IPEndPoint? ServerAddress => (!IsConnected || isServer) ? null : (IPEndPoint?)UdpSocket.Client.RemoteEndPoint;
+    public IPEndPoint? LocalAddress => (!IsConnected) ? null : (IPEndPoint?)(UdpSocket.Client.LocalEndPoint);
 
     public bool IsServer => isServer;
 
@@ -142,9 +145,13 @@ public class Connection
             }
             catch (SocketException ex)
             {
-                Close();
                 Debug.WriteLine($"[Net]: Error ({ex.ErrorCode}) ({ex.NativeErrorCode}) ({ex.SocketErrorCode}): {ex.Message}");
-                break;
+
+                if (!isServer)
+                {
+                    Close();
+                    break;
+                }
             }
         }
     }
@@ -225,18 +232,30 @@ public class Connection
         if (buffer.Length == 0) return;
 
         MessageType messageType = (MessageType)buffer[0];
+        Message message;
 
         switch (messageType)
         {
-            case MessageType.CONTROL:
+            case MessageType.Control:
             {
-                NetControlMessage message = Utils.Deserialize<NetControlMessage>(buffer);
-                FeedControlMessage(source, message);
-                break;
+                NetControlMessage _message = Utils.Deserialize<NetControlMessage>(buffer);
+                FeedControlMessage(source, _message);
+                return;
             }
-            default:
+
+            case MessageType.Object:
+                message = Utils.Deserialize<ObjectMessage>(buffer);
                 break;
+
+            case MessageType.ObjectControl:
+                message = Utils.Deserialize<ObjectControlMessage>(buffer);
+                break;
+
+            default:
+                throw new NotImplementedException();
         }
+
+        OnMessageReceived?.Invoke(message, source);
     }
 
     #endregion
@@ -250,7 +269,7 @@ public class Connection
 
         switch (netControlMessage.Type)
         {
-            case MessageType.CONTROL:
+            case MessageType.Control:
             {
                 switch (netControlMessage.Kind)
                 {

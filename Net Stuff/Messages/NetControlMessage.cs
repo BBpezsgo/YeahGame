@@ -15,13 +15,13 @@ public class NetControlMessage : Message
 
     public NetControlMessage(NetControlMessageKind kind)
     {
-        Type = MessageType.CONTROL;
+        Type = MessageType.Control;
         Kind = kind;
     }
 
     public NetControlMessage()
     {
-        Type = MessageType.CONTROL;
+        Type = MessageType.Control;
     }
 
     public override void Serialize(BinaryWriter writer)

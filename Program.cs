@@ -7,6 +7,7 @@ internal class Program
 {
     static void Main(string[] args)
     {
+        /*
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
 
         {
@@ -33,9 +34,9 @@ internal class Program
                 connection.Tick();
                 Thread.Sleep(50);
             }
+            return;
         }
-
-        return;
+        */
 
         Game game = new();
         game.Start();

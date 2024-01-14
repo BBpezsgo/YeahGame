@@ -2,7 +2,9 @@
 
 public enum MessageType : byte
 {
-    CONTROL = 1,
+    Control = 1,
+    Object = 2,
+    ObjectControl = 3,
 }
 
 public abstract class Message : ISerializable
