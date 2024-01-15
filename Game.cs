@@ -14,7 +14,7 @@ public class Game
 
     float lastNetworkSync;
 
-    public bool ShouldSync => Time.Now - lastNetworkSync > .5f;
+    public bool ShouldSync => Time.Now - lastNetworkSync > .1f;
 
     public Connection Connection;
 
@@ -185,7 +185,11 @@ public class Game
     {
         if (message is Messages.ObjectSyncMessage objectMessage)
         {
-            if (!TryGetNetworkEntity(objectMessage.ObjectId, out NetworkEntity? entity))
+            if (TryGetNetworkEntity(objectMessage.ObjectId, out NetworkEntity? entity))
+            {
+                entity.HandleMessage(objectMessage);
+            }
+            else
             {
                 if (Connection.IsServer)
                 { throw new NotImplementedException(); }
@@ -196,10 +200,6 @@ public class Game
                     Kind = Messages.ObjectControlMessageKind.NotFound,
                 });
                 Debug.WriteLine($"[Net]: Object {objectMessage.ObjectId} not found ...");
-            }
-            else
-            {
-                entity.HandleMessage(objectMessage);
             }
 
             return;
@@ -284,6 +284,32 @@ public class Game
                 }
                 default:
                     break;
+            }
+            return;
+        }
+
+        if (message is Messages.RPCmessage rpcMessage)
+        {
+            if (Connection.IsServer)
+            {
+                Connection.Send(rpcMessage);
+            }
+
+            if (TryGetNetworkEntity(rpcMessage.ObjectId, out NetworkEntity? entity))
+            {
+                entity.HandleRPC(rpcMessage);
+            }
+            else
+            {
+                if (Connection.IsServer)
+                { throw new NotImplementedException(); }
+
+                Connection.Send(new Messages.ObjectControlMessage()
+                {
+                    ObjectId = rpcMessage.ObjectId,
+                    Kind = Messages.ObjectControlMessageKind.NotFound,
+                });
+                Debug.WriteLine($"[Net]: Object {rpcMessage.ObjectId} not found ...");
             }
             return;
         }

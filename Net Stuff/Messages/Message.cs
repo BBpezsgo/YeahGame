@@ -5,6 +5,7 @@ public enum MessageType : byte
     Control = 1,
     ObjectSync = 2,
     ObjectControl = 3,
+    RPC = 4,
 }
 
 public abstract class Message : ISerializable

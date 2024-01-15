@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using YeahGame.Messages;
 
 namespace YeahGame;
 
@@ -91,4 +92,6 @@ public abstract class NetworkEntity : Entity
             EntityPrototype = Prototype,
         }, destination);
     }
+
+    public abstract void HandleRPC(RPCmessage rpcMessage);
 }

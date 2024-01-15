@@ -34,16 +34,34 @@ public class Player : NetworkEntity
                 Vector2 velocity = Mouse.RecordedConsolePosition - Position;
                 velocity *= new Vector2(1f, 2f);
                 velocity = Vector2.Normalize(velocity);
-                velocity *= Projectile.Speed;
-                velocity *= new Vector2(1, 0.5f);
 
-                Projectile newProjectile = new()
+                Game.Singleton.Connection.Send(new RPCmessage()
                 {
-                    Position = Position,
-                    Velocity = velocity,
-                    SpawnedAt = Time.Now
-                };
-                Game.Singleton.projectiles.Add(newProjectile);
+                    ObjectId = NetworkId,
+                    RPCId = 1,
+                    Details = Utils.Serialize(writer =>
+                    {
+                        writer.Write(Position.X);
+                        writer.Write(Position.Y);
+                        writer.Write(velocity.X);
+                        writer.Write(velocity.Y);
+                    })
+                });
+
+                if (Game.Singleton.Connection.IsServer)
+                {
+                    velocity *= Projectile.Speed;
+                    velocity *= new Vector2(1, 0.5f);
+
+                    Projectile newProjectile = new()
+                    {
+                        Position = Position,
+                        Velocity = velocity,
+                        SpawnedAt = Time.Now
+                    };
+                    Game.Singleton.projectiles.Add(newProjectile);
+
+                }
 
                 LastShot = Time.Now;
             }
@@ -78,6 +96,31 @@ public class Player : NetworkEntity
         using BinaryReader reader = new(stream);
         Position.X = reader.ReadSingle();
         Position.Y = reader.ReadSingle();
+    }
+
+    public override void HandleRPC(RPCmessage message)
+    {
+        using MemoryStream stream = new(message.Details);
+        using BinaryReader reader = new(stream);
+        if (message.RPCId == 1)
+        {
+            Vector2 projectilePosition = default;
+            projectilePosition.X = reader.ReadSingle();
+            projectilePosition.Y = reader.ReadSingle();
+            Vector2 velocity = default;
+            velocity.X = reader.ReadSingle();
+            velocity.Y = reader.ReadSingle();
+            velocity *= Projectile.Speed;
+            velocity *= new Vector2(1, 0.5f);
+
+            Projectile newProjectile = new()
+            {
+                Position = projectilePosition,
+                Velocity = velocity,
+                SpawnedAt = Time.Now
+            };
+            Game.Singleton.projectiles.Add(newProjectile);
+        }
     }
 
     public override void NetworkSerialize(BinaryWriter writer)

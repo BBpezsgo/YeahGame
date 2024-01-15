@@ -351,6 +351,11 @@ public class Connection
                     message.Deserialize(reader);
                     break;
 
+                case MessageType.RPC:
+                    message = new RPCmessage();
+                    message.Deserialize(reader);
+                    break;
+
                 default:
                     throw new NotImplementedException();
             }
