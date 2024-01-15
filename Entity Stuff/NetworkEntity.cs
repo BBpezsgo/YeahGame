@@ -1,4 +1,6 @@
-﻿namespace YeahGame;
+﻿using System.Net;
+
+namespace YeahGame;
 
 public abstract class NetworkEntity : Entity
 {
@@ -15,6 +17,15 @@ public abstract class NetworkEntity : Entity
     {
         message.ObjectId = NetworkId;
         Game.Singleton.Connection.Send(message);
+    }
+
+    protected void SendSyncMessage(byte[] details)
+    {
+        Game.Singleton.Connection.Send(new Messages.ObjectSyncMessage()
+        {
+            Details = details,
+            ObjectId = NetworkId,
+        });
     }
 
     public void NetworkSpawn()
@@ -42,6 +53,17 @@ public abstract class NetworkEntity : Entity
         });
     }
 
+    public void NetworkDestroy(IPEndPoint destination)
+    {
+        if (!Game.Singleton.Connection.IsServer) return;
+
+        Game.Singleton.Connection.SendTo(new Messages.ObjectControlMessage()
+        {
+            Kind = Messages.ObjectControlMessageKind.Destroy,
+            ObjectId = NetworkId,
+        }, destination);
+    }
+
     public void NetworkInfo()
     {
         if (!Game.Singleton.Connection.IsServer) return;
@@ -54,5 +76,19 @@ public abstract class NetworkEntity : Entity
             Details = details,
             EntityPrototype = Prototype,
         });
+    }
+
+    public void NetworkInfo(IPEndPoint destination)
+    {
+        if (!Game.Singleton.Connection.IsServer) return;
+
+        byte[] details = Utils.Serialize(NetworkSerialize);
+        Game.Singleton.Connection.SendTo(new Messages.ObjectControlMessage()
+        {
+            Kind = Messages.ObjectControlMessageKind.Info,
+            ObjectId = NetworkId,
+            Details = details,
+            EntityPrototype = Prototype,
+        }, destination);
     }
 }

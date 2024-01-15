@@ -1,6 +1,4 @@
-﻿using System;
-using YeahGame.Messages;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+﻿using YeahGame.Messages;
 
 namespace YeahGame;
 
@@ -18,21 +16,21 @@ public class Player : NetworkEntity
         if (Game.Singleton.TryGetLocalPlayer(out Player? localPlayer) &&
             localPlayer == this)
         {
-            if (Keyboard.IsKeyPressed('W'))
-            { Position.Y -= Speed * 0.5f * Time.Delta; }
-            if (Keyboard.IsKeyPressed('S'))
-            { Position.Y += Speed * 0.5f * Time.Delta; }
-            if (Keyboard.IsKeyPressed('A'))
-            { Position.X -= Speed * Time.Delta; }
-            if (Keyboard.IsKeyPressed('D'))
-            { Position.X += Speed * Time.Delta; }
+            // Movement
+            if (Keyboard.IsKeyPressed('W')) Position.Y -= Speed * 0.5f * Time.Delta;
+            if (Keyboard.IsKeyPressed('S')) Position.Y += Speed * 0.5f * Time.Delta;
+            if (Keyboard.IsKeyPressed('A')) Position.X -= Speed * Time.Delta;
+            if (Keyboard.IsKeyPressed('D')) Position.X += Speed * Time.Delta;
 
+            // Keep inside the world borders
             Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
             Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
 
+            // Shooting
             if (Mouse.IsPressed(MouseButton.Left) &&
                 Time.Now - LastShot > 0.5f)
             {
+                // Calculate projectile direction
                 Vector2 velocity = Mouse.RecordedConsolePosition - Position;
                 velocity *= new Vector2(1f, 2f);
                 velocity = Vector2.Normalize(velocity);
@@ -50,32 +48,28 @@ public class Player : NetworkEntity
                 LastShot = Time.Now;
             }
 
+            // Network sync
             Sync();
         }
-    }
-
-    void Sync()
-    {
-        if (!Game.Singleton.ShouldSync)
-        { return; }
-
-        byte[] data = Utils.Serialize(writer =>
-        {
-            writer.Write(Position.X);
-            writer.Write(Position.Y);
-        });
-
-        Game.Singleton.Connection.Send(new ObjectSyncMessage()
-        {
-            Details = data,
-            ObjectId = NetworkId,
-        });
     }
 
     public override void Render()
     {
         if (!Game.Renderer.IsVisible(Position)) return;
         Game.Renderer[Position] = (ConsoleChar)'○';
+    }
+
+    #region Networking
+
+    void Sync()
+    {
+        if (!Game.Singleton.ShouldSync) return;
+
+        SendSyncMessage(Utils.Serialize(writer =>
+        {
+            writer.Write(Position.X);
+            writer.Write(Position.Y);
+        }));
     }
 
     public override void HandleMessage(ObjectSyncMessage message)
@@ -95,4 +89,6 @@ public class Player : NetworkEntity
     {
         Owner = reader.ReadString();
     }
+
+    #endregion
 }

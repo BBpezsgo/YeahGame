@@ -8,9 +8,19 @@ public static class Time
     static double now;
     static double deltaTime;
 
+    /// <summary>
+    /// Elapsed seconds since midnight at the start of the tick
+    /// </summary>
     public static float Now => (float)now;
+
+    /// <summary>
+    /// Elapsed seconds since the last tick
+    /// </summary>
     public static float Delta => (float)deltaTime;
 
+    /// <summary>
+    /// Elapsed seconds since midnight
+    /// </summary>
     public static double NowNoCache => DateTime.UtcNow.TimeOfDay.TotalSeconds;
 
     public static void Tick()

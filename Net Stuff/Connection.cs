@@ -47,22 +47,36 @@ public class Connection
 
     #endregion
 
+    #region Constants
+
     public const double Timeout = 10;
     public const double PingInterval = 5;
 
-    readonly ConcurrentQueue<UdpMessage> IncomingQueue;
-    readonly Queue<Message> OutgoingQueue;
+    #endregion
+
+    #region Events
 
     public event ClientConnectedEventHandler? OnClientConnected;
     public event ClientDisconnectedEventHandler? OnClientDisconnected;
     public event ConnectedToServerEventHandler? OnConnectedToServer;
     public event DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
     public event MessageReceivedEventHandler? OnMessageReceived;
+    
+    #endregion
+
+    readonly ConcurrentQueue<UdpMessage> IncomingQueue;
+    readonly Queue<Message> OutgoingQueue;
 
     readonly ConcurrentDictionary<string, UdpClient> Connections;
 
-    [MemberNotNullWhen(true, nameof(UdpSocket))]
-    public bool IsConnected => UdpSocket != null;
+    public double ReceivedAt;
+    public double SentAt;
+
+    System.Net.Sockets.UdpClient? UdpSocket;
+    Thread ListeningThread;
+    bool isServer;
+
+    bool ShouldListen;
 
     public IPEndPoint? ServerAddress
     {
@@ -84,20 +98,15 @@ public class Connection
             { return null; }
         }
     }
+
     public bool IsServer => isServer;
+
+    [MemberNotNullWhen(true, nameof(UdpSocket))]
+    public bool IsConnected => UdpSocket != null;
 
     public IReadOnlyList<IPEndPoint> Clients => Connections.Values
         .Select(client => client.EndPoint)
         .ToList();
-
-    public double ReceivedAt;
-    public double SentAt;
-
-    System.Net.Sockets.UdpClient? UdpSocket;
-    Thread ListeningThread;
-    bool isServer;
-
-    bool ShouldListen;
 
     public Connection()
     {
@@ -109,7 +118,7 @@ public class Connection
         ListeningThread = new Thread(Listen) { Name = "UDP Listener" };
     }
 
-    #region UDP Stuff
+    #region Connection Handling
 
     public void Client(IPAddress address, int port)
     {
@@ -192,9 +201,56 @@ public class Connection
         ListeningThread = new Thread(Listen);
     }
 
+    void FeedControlMessage(IPEndPoint source, NetControlMessage netControlMessage)
+    {
+        if (!IsConnected) return;
+
+        if (Connections.TryGetValue(source.ToString(), out UdpClient? client))
+        { client.ReceivedAt = Time.NowNoCache; }
+
+        switch (netControlMessage.Type)
+        {
+            case MessageType.Control:
+            {
+                switch (netControlMessage.Kind)
+                {
+                    case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
+                    {
+                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
+                        OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
+                        return;
+                    }
+                    case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
+                    {
+                        OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
+                        return;
+                    }
+                    case NetControlMessageKind.IM_THERE:
+                    {
+                        return;
+                    }
+                    case NetControlMessageKind.PING:
+                    {
+                        Debug.WriteLine($"[Net]: =={source}=> PONG");
+                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
+                        return;
+                    }
+                    case NetControlMessageKind.PONG:
+                    {
+                        Debug.WriteLine($"[Net]: <={source}== PONG");
+                        return;
+                    }
+                    default: return;
+                }
+            }
+            default:
+                break;
+        }
+    }
+
     #endregion
 
-    #region Message Handling
+    #region Message Handling & Receiving
 
     public void Tick()
     {
@@ -306,53 +362,6 @@ public class Connection
     }
 
     #endregion
-
-    void FeedControlMessage(IPEndPoint source, NetControlMessage netControlMessage)
-    {
-        if (!IsConnected) return;
-
-        if (Connections.TryGetValue(source.ToString(), out UdpClient? client))
-        { client.ReceivedAt = Time.NowNoCache; }
-
-        switch (netControlMessage.Type)
-        {
-            case MessageType.Control:
-            {
-                switch (netControlMessage.Kind)
-                {
-                    case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
-                    {
-                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
-                        OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
-                        return;
-                    }
-                    case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
-                    {
-                        OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
-                        return;
-                    }
-                    case NetControlMessageKind.IM_THERE:
-                    {
-                        return;
-                    }
-                    case NetControlMessageKind.PING:
-                    {
-                        Debug.WriteLine($"[Net]: =={source}=> PONG");
-                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
-                        return;
-                    }
-                    case NetControlMessageKind.PONG:
-                    {
-                        Debug.WriteLine($"[Net]: <={source}== PONG");
-                        return;
-                    }
-                    default: return;
-                }
-            }
-            default:
-                break;
-        }
-    }
 
     #region Message Sending
 

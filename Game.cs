@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Text;
 
 namespace YeahGame;
 
@@ -31,6 +30,7 @@ public class Game
         Hover = CharColor.Make(CharColor.Black, CharColor.White),
         Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
     };
+
     readonly ConsoleRenderer.TextFieldStyle textFieldStyle = new()
     {
         Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
@@ -245,15 +245,7 @@ public class Game
                     if (TryGetNetworkEntity(objectControlMessage.ObjectId, out NetworkEntity? entity))
                     {
                         Debug.WriteLine($"[Net]: Sending object info for {objectControlMessage.ObjectId} to {source} ...");
-
-                        byte[] details = Utils.Serialize(entity.NetworkSerialize);
-                        Game.Singleton.Connection.SendTo(new Messages.ObjectControlMessage()
-                        {
-                            Kind = Messages.ObjectControlMessageKind.Info,
-                            ObjectId = entity.NetworkId,
-                            Details = details,
-                            EntityPrototype = entity.Prototype,
-                        }, source);
+                        entity.NetworkInfo(source);
                     }
                     else
                     {
@@ -276,9 +268,7 @@ public class Game
 
                     if (TryGetNetworkEntity(objectControlMessage.ObjectId, out NetworkEntity? entity))
                     {
-                        using MemoryStream stream = new(objectControlMessage.Details);
-                        using BinaryReader reader = new(stream);
-                        entity.NetworkDeserialize(reader);
+                        Utils.Deserialize(objectControlMessage.Details, entity.NetworkDeserialize);
                     }
                     else
                     {
@@ -303,9 +293,7 @@ public class Game
     {
         int id = 1;
         while (TryGetNetworkEntity(id, out _))
-        {
-            id++;
-        }
+        { id++; }
         return id;
     }
 
@@ -322,10 +310,7 @@ public class Game
 
         result.NetworkId = networkId;
 
-        using MemoryStream stream = new(details);
-        using BinaryReader reader = new(stream);
-
-        result.NetworkDeserialize(reader);
+        Utils.Deserialize(details, result.NetworkDeserialize);
 
         return result;
     }
