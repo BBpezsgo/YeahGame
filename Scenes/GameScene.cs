@@ -72,8 +72,7 @@ public class GameScene : Scene
                 NetworkId = GenerateNetworkId(),
                 Position = new Vector2(10, 5),
             };
-            player.NetworkSpawn();
-            AddEntity(player);
+            SpawnEntity(player);
         }
 
         _entities.UpdateAll();
@@ -139,6 +138,23 @@ public class GameScene : Scene
         { _projectiles.Remove(projectile); }
 
         return _entities.Remove(entity);
+    }
+
+    public void SpawnEntity(Entity entity)
+    {
+        if (Game.IsServer && entity is NetworkEntity networkEntity)
+        {
+            byte[] details = Utils.Serialize(networkEntity.NetworkSerialize);
+            Game.Connection.Send(new ObjectControlMessage()
+            {
+                Kind = ObjectControlMessageKind.Spawn,
+                ObjectId = networkEntity.NetworkId,
+                Details = details,
+                EntityPrototype = networkEntity.Prototype,
+            });
+        }
+
+        AddEntity(entity);
     }
 
     public void AddEntity(Entity entity)
@@ -207,8 +223,7 @@ public class GameScene : Scene
             NetworkId = GenerateNetworkId(),
             Position = new Vector2(10, 5),
         };
-        player.NetworkSpawn();
-        AddEntity(player);
+        SpawnEntity(player);
     }
 
     public void OnMessageReceived(Message message, IPEndPoint source)
@@ -273,7 +288,15 @@ public class GameScene : Scene
                     if (TryGetNetworkEntity(objectControlMessage.ObjectId, out NetworkEntity? entity))
                     {
                         Debug.WriteLine($"[Net]: Sending object info for {objectControlMessage.ObjectId} to {source} ...");
-                        entity.NetworkInfo(source);
+
+                        byte[] details = Utils.Serialize(entity.NetworkSerialize);
+                        Game.Connection.SendTo(new ObjectControlMessage()
+                        {
+                            Kind = ObjectControlMessageKind.Info,
+                            ObjectId = entity.NetworkId,
+                            Details = details,
+                            EntityPrototype = entity.Prototype,
+                        }, source);
                     }
                     else
                     {
