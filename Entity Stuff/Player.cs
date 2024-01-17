@@ -13,7 +13,7 @@ public class Player : NetworkEntity
 
     public override void Update()
     {
-        if (Game.Singleton.TryGetLocalPlayer(out Player? localPlayer) &&
+        if (Game.Singleton.GameScene.TryGetLocalPlayer(out Player? localPlayer) &&
             localPlayer == this)
         {
             // Movement
@@ -35,7 +35,7 @@ public class Player : NetworkEntity
                 velocity *= new Vector2(1f, 2f);
                 velocity = Vector2.Normalize(velocity);
 
-                Game.Singleton.Connection.Send(new RPCmessage()
+                Game.Connection.Send(new RPCmessage()
                 {
                     ObjectId = NetworkId,
                     RPCId = 1,
@@ -48,7 +48,7 @@ public class Player : NetworkEntity
                     })
                 });
 
-                if (Game.Singleton.Connection.IsServer)
+                if (Game.IsServer)
                 {
                     velocity *= Projectile.Speed;
                     velocity *= new Vector2(1, 0.5f);
@@ -59,7 +59,7 @@ public class Player : NetworkEntity
                         Velocity = velocity,
                         SpawnedAt = Time.Now
                     };
-                    Game.Singleton.projectiles.Add(newProjectile);
+                    Game.Singleton.GameScene.AddEntity(newProjectile);
 
                 }
 
@@ -81,7 +81,7 @@ public class Player : NetworkEntity
 
     void Sync()
     {
-        if (!Game.Singleton.ShouldSync) return;
+        if (!Game.Singleton.GameScene.ShouldSync) return;
 
         SendSyncMessage(Utils.Serialize(writer =>
         {
@@ -119,7 +119,7 @@ public class Player : NetworkEntity
                 Velocity = velocity,
                 SpawnedAt = Time.Now
             };
-            Game.Singleton.projectiles.Add(newProjectile);
+            Game.Singleton.GameScene.AddEntity(newProjectile);
         }
     }
 

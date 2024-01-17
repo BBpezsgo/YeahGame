@@ -7,6 +7,7 @@ public enum NetControlMessageKind : byte
     IM_THERE,
     PING,
     PONG,
+    GetInfo,
 }
 
 public class NetControlMessage : Message

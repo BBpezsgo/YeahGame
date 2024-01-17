@@ -17,12 +17,12 @@ public abstract class NetworkEntity : Entity
     protected void SendMessage(Messages.ObjectSyncMessage message)
     {
         message.ObjectId = NetworkId;
-        Game.Singleton.Connection.Send(message);
+        Game.Connection.Send(message);
     }
 
     protected void SendSyncMessage(byte[] details)
     {
-        Game.Singleton.Connection.Send(new Messages.ObjectSyncMessage()
+        Game.Connection.Send(new ObjectSyncMessage()
         {
             Details = details,
             ObjectId = NetworkId,
@@ -31,12 +31,12 @@ public abstract class NetworkEntity : Entity
 
     public void NetworkSpawn()
     {
-        if (!Game.Singleton.Connection.IsServer) return;
+        if (!Game.IsServer) return;
 
         byte[] details = Utils.Serialize(NetworkSerialize);
-        Game.Singleton.Connection.Send(new Messages.ObjectControlMessage()
+        Game.Connection.Send(new ObjectControlMessage()
         {
-            Kind = Messages.ObjectControlMessageKind.Spawn,
+            Kind = ObjectControlMessageKind.Spawn,
             ObjectId = NetworkId,
             Details = details,
             EntityPrototype = Prototype,
@@ -45,34 +45,34 @@ public abstract class NetworkEntity : Entity
 
     public void NetworkDestroy()
     {
-        if (!Game.Singleton.Connection.IsServer) return;
+        if (!Game.IsServer) return;
 
-        Game.Singleton.Connection.Send(new Messages.ObjectControlMessage()
+        Game.Connection.Send(new ObjectControlMessage()
         {
-            Kind = Messages.ObjectControlMessageKind.Destroy,
+            Kind = ObjectControlMessageKind.Destroy,
             ObjectId = NetworkId,
         });
     }
 
     public void NetworkDestroy(IPEndPoint destination)
     {
-        if (!Game.Singleton.Connection.IsServer) return;
+        if (!Game.IsServer) return;
 
-        Game.Singleton.Connection.SendTo(new Messages.ObjectControlMessage()
+        Game.Connection.SendTo(new ObjectControlMessage()
         {
-            Kind = Messages.ObjectControlMessageKind.Destroy,
+            Kind = ObjectControlMessageKind.Destroy,
             ObjectId = NetworkId,
         }, destination);
     }
 
     public void NetworkInfo()
     {
-        if (!Game.Singleton.Connection.IsServer) return;
+        if (!Game.IsServer) return;
 
         byte[] details = Utils.Serialize(NetworkSerialize);
-        Game.Singleton.Connection.Send(new Messages.ObjectControlMessage()
+        Game.Connection.Send(new ObjectControlMessage()
         {
-            Kind = Messages.ObjectControlMessageKind.Info,
+            Kind = ObjectControlMessageKind.Info,
             ObjectId = NetworkId,
             Details = details,
             EntityPrototype = Prototype,
@@ -81,12 +81,12 @@ public abstract class NetworkEntity : Entity
 
     public void NetworkInfo(IPEndPoint destination)
     {
-        if (!Game.Singleton.Connection.IsServer) return;
+        if (!Game.IsServer) return;
 
         byte[] details = Utils.Serialize(NetworkSerialize);
-        Game.Singleton.Connection.SendTo(new Messages.ObjectControlMessage()
+        Game.Connection.SendTo(new ObjectControlMessage()
         {
-            Kind = Messages.ObjectControlMessageKind.Info,
+            Kind = ObjectControlMessageKind.Info,
             ObjectId = NetworkId,
             Details = details,
             EntityPrototype = Prototype,

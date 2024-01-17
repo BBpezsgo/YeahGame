@@ -9,11 +9,11 @@ using UdpMessage = (byte[] Buffer, System.Net.IPEndPoint Source);
 
 namespace YeahGame;
 
-public class Connection
+public class Connection<T> where T : ISerializable
 {
     #region Types'n Stuff
 
-    class UdpClient
+    class UdpClient<T2> where T2 : ISerializable
     {
         public readonly ConcurrentQueue<byte[]> IncomingQueue;
         public readonly ConcurrentQueue<byte[]> OutgoingQueue;
@@ -22,7 +22,9 @@ public class Connection
         public double ReceivedAt;
         public double SentAt;
 
-        public UdpClient(IPEndPoint endPoint)
+        public T2? Data;
+
+        public UdpClient(IPEndPoint endPoint, T2? data)
         {
             IncomingQueue = new ConcurrentQueue<byte[]>();
             OutgoingQueue = new ConcurrentQueue<byte[]>();
@@ -30,6 +32,8 @@ public class Connection
 
             ReceivedAt = Time.NowNoCache;
             SentAt = Time.NowNoCache;
+
+            Data = data;
         }
     }
 
@@ -61,18 +65,20 @@ public class Connection
     public event ConnectedToServerEventHandler? OnConnectedToServer;
     public event DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
     public event MessageReceivedEventHandler? OnMessageReceived;
-    
+
     #endregion
+
+    public T? UserInfo;
 
     readonly ConcurrentQueue<UdpMessage> IncomingQueue;
     readonly Queue<Message> OutgoingQueue;
 
-    readonly ConcurrentDictionary<string, UdpClient> Connections;
+    readonly ConcurrentDictionary<string, UdpClient<T>> Connections;
 
     public double ReceivedAt;
     public double SentAt;
 
-    System.Net.Sockets.UdpClient? UdpSocket;
+    UdpClient? UdpSocket;
     Thread ListeningThread;
     bool isServer;
 
@@ -113,7 +119,7 @@ public class Connection
         IncomingQueue = new ConcurrentQueue<UdpMessage>();
         OutgoingQueue = new Queue<Message>();
 
-        Connections = new ConcurrentDictionary<string, UdpClient>();
+        Connections = new ConcurrentDictionary<string, UdpClient<T>>();
 
         ListeningThread = new Thread(Listen) { Name = "UDP Listener" };
     }
@@ -123,7 +129,7 @@ public class Connection
     public void Client(IPAddress address, int port)
     {
         isServer = false;
-        UdpSocket = new System.Net.Sockets.UdpClient();
+        UdpSocket = new UdpClient();
         UdpSocket.Connect(address, port);
         ShouldListen = true;
         ListeningThread.Start();
@@ -136,7 +142,7 @@ public class Connection
     public void Server(IPAddress address, int port)
     {
         isServer = true;
-        UdpSocket = new System.Net.Sockets.UdpClient(new IPEndPoint(address, port));
+        UdpSocket = new UdpClient(new IPEndPoint(address, port));
         ShouldListen = true;
         ListeningThread.Start();
         ReceivedAt = Time.NowNoCache;
@@ -160,9 +166,9 @@ public class Connection
 
                 if (isServer)
                 {
-                    if (!Connections.TryGetValue(source.ToString(), out UdpClient? client))
+                    if (!Connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
                     {
-                        client = new UdpClient(source);
+                        client = new UdpClient<T>(source, default);
                         Connections.TryAdd(source.ToString(), client);
                         OnClientConnected?.Invoke(source, ConnectingPhase.Connected);
                     }
@@ -205,46 +211,52 @@ public class Connection
     {
         if (!IsConnected) return;
 
-        if (Connections.TryGetValue(source.ToString(), out UdpClient? client))
+        if (Connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
         { client.ReceivedAt = Time.NowNoCache; }
 
-        switch (netControlMessage.Type)
+        switch (netControlMessage.Kind)
         {
-            case MessageType.Control:
+            case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
             {
-                switch (netControlMessage.Kind)
-                {
-                    case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
-                    {
-                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
-                        OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
-                        return;
-                    }
-                    case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
-                    {
-                        OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
-                        return;
-                    }
-                    case NetControlMessageKind.IM_THERE:
-                    {
-                        return;
-                    }
-                    case NetControlMessageKind.PING:
-                    {
-                        Debug.WriteLine($"[Net]: =={source}=> PONG");
-                        SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
-                        return;
-                    }
-                    case NetControlMessageKind.PONG:
-                    {
-                        Debug.WriteLine($"[Net]: <={source}== PONG");
-                        return;
-                    }
-                    default: return;
-                }
+                SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
+                OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
+                return;
             }
-            default:
-                break;
+            case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
+            {
+                OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
+                return;
+            }
+            case NetControlMessageKind.IM_THERE:
+            {
+                return;
+            }
+            case NetControlMessageKind.PING:
+            {
+                Debug.WriteLine($"[Net]: =={source}=> PONG");
+                SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
+                return;
+            }
+            case NetControlMessageKind.PONG:
+            {
+                Debug.WriteLine($"[Net]: <={source}== PONG");
+                return;
+            }
+
+            case NetControlMessageKind.GetInfo:
+                Debug.WriteLine($"[Net]: <={source}== GetInfo");
+
+                if (UserInfo is not null)
+                {
+                    SendImmediateTo(new InfoResponseMessage()
+                    {
+                        Details = Utils.Serialize(UserInfo),
+                    }, source);
+                }
+
+                return;
+
+            default: return;
         }
     }
 
@@ -264,14 +276,14 @@ public class Connection
             { break; }
         }
 
-        while (OutgoingQueue.TryDequeue(out Message? messageOut))
+        while (OutgoingQueue.TryDequeue(out Message? messageOut) && IsConnected)
         { SendImmediate(messageOut); }
 
         List<string> shouldRemove = new();
 
-        foreach (KeyValuePair<string, UdpClient> client in Connections)
+        foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
         {
-            while (client.Value.OutgoingQueue.TryDequeue(out byte[]? messageOut))
+            while (client.Value.OutgoingQueue.TryDequeue(out byte[]? messageOut) && IsConnected)
             {
                 SendImmediateTo(messageOut, client.Value.EndPoint);
             }
@@ -282,7 +294,8 @@ public class Connection
             }
 
             if (Time.NowNoCache - client.Value.ReceivedAt > PingInterval &&
-                Time.NowNoCache - client.Value.SentAt > PingInterval)
+                Time.NowNoCache - client.Value.SentAt > PingInterval &&
+                IsConnected)
             {
                 Debug.WriteLine($"[Net]: =={client.Value.EndPoint}=> PING");
                 SendImmediateTo(new NetControlMessage(NetControlMessageKind.PING), client.Value.EndPoint);
@@ -298,7 +311,7 @@ public class Connection
 
         for (int i = 0; i < shouldRemove.Count; i++)
         {
-            if (Connections.TryRemove(shouldRemove[i], out UdpClient? removedClient))
+            if (Connections.TryRemove(shouldRemove[i], out UdpClient<T>? removedClient))
             { OnClientDisconnected?.Invoke(removedClient.EndPoint); }
         }
 
@@ -370,7 +383,7 @@ public class Connection
 
     #region Message Sending
 
-    public void SendImmediate<T>(T data) where T : ISerializable
+    public void SendImmediate<TMessage>(TMessage data) where TMessage : ISerializable
         => SendImmediate(Utils.Serialize(data));
 
     public void SendImmediate(byte[] data)
@@ -380,7 +393,7 @@ public class Connection
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
             {
                 UdpSocket.Send(data, data.Length, client.Value.EndPoint);
             }
@@ -398,7 +411,7 @@ public class Connection
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
             {
                 if (!client.Value.EndPoint.Equals(destination)) continue;
 
@@ -414,7 +427,7 @@ public class Connection
         }
     }
 
-    public void SendImmediateTo<T>(T data, IPEndPoint destination) where T : ISerializable
+    public void SendImmediateTo<TMessage>(TMessage data, IPEndPoint destination) where TMessage : ISerializable
         => SendImmediateTo(Utils.Serialize(data), destination);
 
     public void SendImmediateTo(byte[] data, IPEndPoint destination)
@@ -424,7 +437,7 @@ public class Connection
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
             {
                 if (!client.Value.EndPoint.Equals(destination)) continue;
 
