@@ -53,7 +53,7 @@ public class Player : NetworkEntity
                     velocity *= Projectile.Speed;
                     velocity *= new Vector2(1, 0.5f);
 
-                    Projectile newProjectile = new()
+                    Projectile newProjectile = new(this)
                     {
                         Position = Position,
                         Velocity = velocity,
@@ -113,7 +113,7 @@ public class Player : NetworkEntity
             velocity *= Projectile.Speed;
             velocity *= new Vector2(1, 0.5f);
 
-            Projectile newProjectile = new()
+            Projectile newProjectile = new(this)
             {
                 Position = projectilePosition,
                 Velocity = velocity,

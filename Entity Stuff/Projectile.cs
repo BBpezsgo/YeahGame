@@ -6,6 +6,12 @@ public class Projectile : Entity
 
     public Vector2 Velocity;
     public float SpawnedAt;
+    public Entity Owner;
+
+    public Projectile(Entity owner)
+    {
+        Owner = owner;
+    }
 
     public override void Render()
     {
@@ -47,14 +53,14 @@ public class Projectile : Entity
 
         foreach (Entity entity in Game.Singleton.GameScene.Entities)
         {
-            if (entity is Tester)
+            if (entity == Owner) continue;
+            if (entity is Projectile) continue;
+
+            Vector2 p = Utils.Point2LineDistance(lastPos, Position, entity.Position);
+            if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
             {
-                Vector2 p = Utils.Point2LineDistance(lastPos, Position, entity.Position);
-                if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
-                {
-                    hit = true;
-                    break;
-                }
+                hit = true;
+                break;
             }
         }
 
