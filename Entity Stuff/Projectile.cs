@@ -50,7 +50,7 @@ public class Projectile : Entity
             if (entity is Tester)
             {
                 Vector2 p = Utils.Point2LineDistance(lastPos, Position, entity.Position);
-                if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(Position, entity.Position) < deltaPos.Length() * 2f)
+                if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
                 {
                     hit = true;
                     break;
