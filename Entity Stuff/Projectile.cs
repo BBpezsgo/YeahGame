@@ -4,6 +4,8 @@ public class Projectile : Entity
 {
     public const float Speed = 25f;
 
+    public const int Damage = 1;
+
     public Vector2 Velocity;
     public float SpawnedAt;
     public Entity Owner;
@@ -60,6 +62,10 @@ public class Projectile : Entity
             if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
             {
                 hit = true;
+                if (entity is Player player)
+                {
+                    player.Damage(Damage);
+                }
                 break;
             }
         }

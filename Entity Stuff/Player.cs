@@ -6,6 +6,8 @@ public class Player : NetworkEntity
 {
     const float Speed = 10;
 
+    public float HP = 1;
+
     float LastShot = Time.Now;
     public string? Owner;
 
@@ -71,6 +73,29 @@ public class Player : NetworkEntity
         }
     }
 
+    public void Damage(float amount)
+    {
+        if (Game.IsServer)
+        {
+            Game.Connection.Send(new RPCmessage()
+            {
+                ObjectId = NetworkId,
+                RPCId = 2,
+                Details = Utils.Serialize(writer =>
+                {
+                    writer.Write(amount);
+                })
+            });
+
+            HP -= amount;
+            if (HP <= 0)
+            {
+                DoesExist = false;
+                // Menu
+            }
+        }
+    }
+
     public override void Render()
     {
         if (!Game.Renderer.IsVisible(Position)) return;
@@ -120,6 +145,11 @@ public class Player : NetworkEntity
                 SpawnedAt = Time.Now
             };
             Game.Singleton.GameScene.AddEntity(newProjectile);
+        }
+
+        else if (message.RPCId == 2)
+        {
+            Damage(reader.ReadSingle());
         }
     }
 
