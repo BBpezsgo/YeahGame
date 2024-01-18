@@ -1,12 +1,20 @@
 ﻿
+using System.Diagnostics.CodeAnalysis;
+
 namespace YeahGame.Messages;
 
 public class ObjectSyncMessage : Message
 {
-    public int ObjectId;
-    public byte[] Details = Array.Empty<byte>();
+    public required int ObjectId { get; set; }
+    public byte[] Details { get; set; }
 
-    public ObjectSyncMessage() : base(MessageType.ObjectSync) { }
+    public ObjectSyncMessage() : base(MessageType.ObjectSync)
+    {
+        Details = Array.Empty<byte>();
+    }
+
+    [SetsRequiredMembers]
+    public ObjectSyncMessage(BinaryReader reader) : this() => Deserialize(reader);
 
     public override void Deserialize(BinaryReader reader)
     {

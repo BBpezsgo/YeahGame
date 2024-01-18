@@ -1,13 +1,21 @@
 ﻿
+using System.Diagnostics.CodeAnalysis;
+
 namespace YeahGame.Messages;
 
-public class RPCmessage : Message
+public class RPCMessage : Message
 {
-    public int ObjectId;
-    public int RPCId;
-    public byte[] Details = Array.Empty<byte>();
+    public required int ObjectId { get; set; }
+    public required int RPCId { get; set; }
+    public byte[] Details { get; set; }
 
-    public RPCmessage() : base(MessageType.RPC) { }
+    public RPCMessage() : base(MessageType.RPC)
+    {
+        Details = Array.Empty<byte>();
+    }
+
+    [SetsRequiredMembers]
+    public RPCMessage(BinaryReader reader) : this() => Deserialize(reader);
 
     public override void Deserialize(BinaryReader reader)
     {

@@ -9,14 +9,18 @@ public class GameScene : Scene
 {
     public override string Name => "Game";
 
-    float lastNetworkSync;
+    float lastPlayerInfoSync;
+    public bool ShouldSyncPlayerInfo => Time.Now - lastPlayerInfoSync > 5f;
 
+    float lastNetworkSync;
     public bool ShouldSync => Time.Now - lastNetworkSync > .1f;
 
     readonly WeakList<Player> _players = new();
     readonly WeakList<Projectile> _projectiles = new();
     readonly WeakList<NetworkEntity> _networkEntities = new();
     readonly List<Entity> _entities = new();
+
+    readonly Dictionary<string, float> _respawnTimers = new();
 
     public readonly bool[] Map;
     public readonly int MapWidth;
@@ -57,11 +61,66 @@ public class GameScene : Scene
 
     public override void Render()
     {
-        _entities.RenderAll();
+        for (int i = 0; i < _entities.Count; i++)
+        {
+            Entity entity = _entities[i];
+            if (entity.DoesExist) entity.Render();
+        }
+
+        if (Keyboard.IsKeyHold('\t'))
+        {
+            IReadOnlyDictionary<string, (PlayerInfo Info, bool IsServer)> infos = Game.Connection.PlayerInfos;
+
+            SmallRect box = Layout.Center(new Coord(50, infos.Count + 4), new SmallRect(default, Game.Renderer.Rect));
+
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+
+            int i = 2;
+
+            if (Game.Connection.IsServer)
+            {
+                Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalAddress}) (Server)", CharColor.BrightMagenta);
+            }
+
+            foreach (KeyValuePair<string, (PlayerInfo Info, bool IsServer)> item in infos)
+            {
+                if (item.Key == Game.Connection.LocalAddress?.ToString())
+                {
+                    Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta);
+                }
+                else
+                {
+                    Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.White);
+                }
+            }
+        }
     }
 
     public override void Tick()
     {
+        if (Game.Connection.IsConnected && ShouldSyncPlayerInfo)
+        {
+            lastPlayerInfoSync = Time.Now;
+            Game.Connection.Send(new InfoRequestMessage()
+            {
+                From = null,
+                FromServer = false,
+            });
+            Game.Connection.Send(new InfoRequestMessage()
+            {
+                From = null,
+                FromServer = true,
+            });
+        }
+
+        if (!TryGetLocalPlayer(out _))
+        {
+            SmallRect box = Layout.Center(new Coord(50, 7), new SmallRect(default, Game.Renderer.Rect));
+
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            Game.Renderer.Text(box.Left + 2, box.Top + 2, "YOU DIED", CharColor.BrightRed);
+        }
+
         if (!TryGetLocalPlayer(out _) &&
             Game.IsServer &&
             Game.Connection.IsConnected)
@@ -75,7 +134,15 @@ public class GameScene : Scene
             SpawnEntity(player);
         }
 
-        _entities.UpdateAll();
+        for (int i = _entities.Count - 1; i >= 0; i--)
+        {
+            Entity entity = _entities[i];
+            if (entity.DoesExist) entity.Update();
+            else
+            {
+                DestroyEntity(entity);
+            }
+        }
 
         for (int i = 0; i < Map.Length; i++)
         {
@@ -336,7 +403,7 @@ public class GameScene : Scene
             return;
         }
 
-        if (message is RPCmessage rpcMessage)
+        if (message is RPCMessage rpcMessage)
         {
             if (Game.IsServer)
             {

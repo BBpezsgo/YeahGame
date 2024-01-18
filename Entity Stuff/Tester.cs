@@ -18,7 +18,7 @@ public class Tester : NetworkEntity
         Position.Y = reader.ReadSingle();
     }
 
-    public override void HandleRPC(RPCmessage rpcMessage)
+    public override void HandleRPC(RPCMessage rpcMessage)
     {
 
     }

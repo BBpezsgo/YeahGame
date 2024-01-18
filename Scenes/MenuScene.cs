@@ -65,6 +65,11 @@ public class MenuScene : Scene
             ButtonStyle))
         {
             InputSocketError = null;
+            Game.Connection.LocalUserInfo = new PlayerInfo()
+            {
+                Username = InputName.Value.ToString(),
+            };
+
             if (IPAddress.TryParse(InputSocket.Value.ToString(), out IPAddress? address))
             { Game.Connection.Client(address, 5000); }
             else
@@ -80,6 +85,11 @@ public class MenuScene : Scene
             ButtonStyle))
         {
             InputSocketError = null;
+            Game.Connection.LocalUserInfo = new PlayerInfo()
+            {
+                Username = InputName.Value.ToString(),
+            };
+
             if (IPAddress.TryParse(InputSocket.Value.ToString(), out IPAddress? address))
             { Game.Connection.Server(address, 5000); }
             else

@@ -1,4 +1,6 @@
 ﻿
+using System.Diagnostics.CodeAnalysis;
+
 namespace YeahGame.Messages;
 
 public enum ObjectControlMessageKind : byte
@@ -26,12 +28,18 @@ public enum ObjectControlMessageKind : byte
 
 public class ObjectControlMessage : Message
 {
-    public ObjectControlMessageKind Kind;
-    public int ObjectId;
-    public EntityPrototype EntityPrototype;
-    public byte[] Details = Array.Empty<byte>();
+    public required ObjectControlMessageKind Kind { get; set; }
+    public int ObjectId { get; set; }
+    public EntityPrototype EntityPrototype { get; set; }
+    public byte[] Details { get; set; }
 
-    public ObjectControlMessage() : base(MessageType.ObjectControl) { }
+    public ObjectControlMessage() : base(MessageType.ObjectControl)
+    {
+        Details = Array.Empty<byte>();
+    }
+
+    [SetsRequiredMembers]
+    public ObjectControlMessage(BinaryReader reader) : this() => Deserialize(reader);
 
     public override void Deserialize(BinaryReader reader)
     {

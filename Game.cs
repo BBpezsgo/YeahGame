@@ -6,7 +6,7 @@ namespace YeahGame;
 
 public class PlayerInfo : ISerializable
 {
-    public string Username;
+    public required string Username { get; set; }
 
     public void Deserialize(BinaryReader reader)
     {
@@ -77,6 +77,11 @@ public class Game
     public void Start()
     {
         bool wasResized = false;
+
+        Console.WindowWidth = 80;
+        Console.BufferWidth = 80;
+        Console.WindowHeight = 30;
+        Console.BufferHeight = 30;
 
         ConsoleListener.KeyEvent += Keyboard.Feed;
         ConsoleListener.MouseEvent += Mouse.Feed;

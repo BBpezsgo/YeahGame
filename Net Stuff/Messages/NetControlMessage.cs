@@ -1,4 +1,6 @@
-﻿namespace YeahGame.Messages;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace YeahGame.Messages;
 
 public enum NetControlMessageKind : byte
 {
@@ -7,19 +9,22 @@ public enum NetControlMessageKind : byte
     IM_THERE,
     PING,
     PONG,
-    GetInfo,
 }
 
 public class NetControlMessage : Message
 {
-    public NetControlMessageKind Kind;
+    public required NetControlMessageKind Kind { get; set; }
 
+    [SetsRequiredMembers]
     public NetControlMessage(NetControlMessageKind kind) : base(MessageType.Control)
     {
         Kind = kind;
     }
 
     public NetControlMessage() : base(MessageType.Control) { }
+
+    [SetsRequiredMembers]
+    public NetControlMessage(BinaryReader reader) : this() => Deserialize(reader);
 
     public override void Serialize(BinaryWriter writer)
     {

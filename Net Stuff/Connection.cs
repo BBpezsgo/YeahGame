@@ -9,7 +9,7 @@ using UdpMessage = (byte[] Buffer, System.Net.IPEndPoint Source);
 
 namespace YeahGame;
 
-public class Connection<T> where T : ISerializable
+public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T> where T : ISerializable
 {
     #region Types'n Stuff
 
@@ -53,8 +53,8 @@ public class Connection<T> where T : ISerializable
 
     #region Constants
 
-    public const double Timeout = 10;
-    public const double PingInterval = 5;
+    public const double Timeout = 10d;
+    public const double PingInterval = 5d;
 
     #endregion
 
@@ -68,12 +68,15 @@ public class Connection<T> where T : ISerializable
 
     #endregion
 
-    public T? UserInfo;
+    public T? LocalUserInfo;
 
     readonly ConcurrentQueue<UdpMessage> IncomingQueue;
     readonly Queue<Message> OutgoingQueue;
 
     readonly ConcurrentDictionary<string, UdpClient<T>> Connections;
+
+    public IReadOnlyDictionary<string, (T Info, bool IsServer)> PlayerInfos => _playerInfos;
+    readonly Dictionary<string, (T Info, bool IsServer)> _playerInfos;
 
     public double ReceivedAt;
     public double SentAt;
@@ -120,6 +123,8 @@ public class Connection<T> where T : ISerializable
         OutgoingQueue = new Queue<Message>();
 
         Connections = new ConcurrentDictionary<string, UdpClient<T>>();
+
+        _playerInfos = new Dictionary<string, (T, bool)>();
 
         ListeningThread = new Thread(Listen) { Name = "UDP Listener" };
     }
@@ -243,19 +248,6 @@ public class Connection<T> where T : ISerializable
                 return;
             }
 
-            case NetControlMessageKind.GetInfo:
-                Debug.WriteLine($"[Net]: <={source}== GetInfo");
-
-                if (UserInfo is not null)
-                {
-                    SendImmediateTo(new InfoResponseMessage()
-                    {
-                        Details = Utils.Serialize(UserInfo),
-                    }, source);
-                }
-
-                return;
-
             default: return;
         }
     }
@@ -348,32 +340,126 @@ public class Connection<T> where T : ISerializable
             {
                 case MessageType.Control:
                 {
-                    NetControlMessage _message = new();
-                    _message.Deserialize(reader);
+                    NetControlMessage _message = new(reader);
                     FeedControlMessage(source, _message);
                     return;
                 }
 
                 case MessageType.ObjectSync:
-                    message = new ObjectSyncMessage();
-                    message.Deserialize(reader);
+                    message = new ObjectSyncMessage(reader);
                     break;
 
                 case MessageType.ObjectControl:
-                    message = new ObjectControlMessage();
-                    message.Deserialize(reader);
+                    message = new ObjectControlMessage(reader);
                     break;
 
                 case MessageType.RPC:
-                    message = new RPCmessage();
-                    message.Deserialize(reader);
+                    message = new RPCMessage(reader);
                     break;
+
+                case MessageType.InfoResponse:
+                {
+                    InfoResponseMessage _message = new(reader);
+
+                    Debug.WriteLine($"[Net]: <= {source} == {_message}");
+
+                    if (IsServer)
+                    {
+                        if (_message.Source is not null)
+                        { _playerInfos[_message.Source.ToString()] = (Utils.Deserialize<T>(_message.Details), false); }
+                        else
+                        { _playerInfos[source.ToString()] = (Utils.Deserialize<T>(_message.Details), false); }
+
+                        Send(_message);
+                    }
+                    else
+                    {
+                        if (_message.Source is not null)
+                        { _playerInfos[_message.Source.ToString()] = (Utils.Deserialize<T>(_message.Details), false); }
+                        else if (_message.IsServer && ServerAddress is not null)
+                        { _playerInfos[ServerAddress.ToString()] = (Utils.Deserialize<T>(_message.Details), true); }
+                    }
+
+                    return;
+                }
+
+                case MessageType.InfoRequest:
+                {
+                    InfoRequestMessage _message = new(reader);
+
+                    Debug.WriteLine($"[Net]: <= {source} == {_message}");
+
+                    if (IsServer)
+                    {
+                        if (_message.FromServer)
+                        {
+                            if (LocalUserInfo is not null)
+                            {
+                                SendTo(new InfoResponseMessage()
+                                {
+                                    IsServer = true,
+                                    Source = null,
+                                    Details = Utils.Serialize(LocalUserInfo),
+                                }, source);
+                            }
+                        }
+                        else
+                        {
+                            if (_message.From is not null)
+                            {
+                                if (_playerInfos.TryGetValue(_message.From.ToString(), out (T Info, bool IsServer) info))
+                                {
+                                    SendTo(new InfoResponseMessage()
+                                    {
+                                        IsServer = false,
+                                        Source = _message.From,
+                                        Details = Utils.Serialize(info.Info),
+                                    }, source);
+                                }
+                                else
+                                {
+                                    SendTo(new InfoRequestMessage()
+                                    {
+                                        From = _message.From,
+                                        FromServer = false,
+                                    }, _message.From);
+                                }
+                            }
+                            else
+                            {
+                                foreach (KeyValuePair<string, (T Info, bool IsServer)> item in _playerInfos)
+                                {
+                                    SendTo(new InfoResponseMessage()
+                                    {
+                                        IsServer = false,
+                                        Source = IPEndPoint.Parse(item.Key),
+                                        Details = Utils.Serialize(item.Value.Info),
+                                    }, source);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (LocalUserInfo is not null)
+                        {
+                            SendTo(new InfoResponseMessage()
+                            {
+                                IsServer = false,
+                                Source = null,
+                                Details = Utils.Serialize(LocalUserInfo),
+                            }, source);
+                        }
+                    }
+
+                    return;
+                }
 
                 default:
                     throw new NotImplementedException();
             }
 
-            Debug.WriteLine($"[Net]: <= {source} == {message}");
+            // Debug.WriteLine($"[Net]: <= {source} == {message}");
 
             OnMessageReceived?.Invoke(message, source);
         }

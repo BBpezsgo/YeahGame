@@ -1,4 +1,7 @@
-﻿namespace YeahGame;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
+
+namespace YeahGame;
 
 public static partial class Utils
 {
@@ -14,6 +17,16 @@ public static partial class Utils
         writer.Flush();
         writer.Close();
         return stream.ToArray();
+    }
+
+    public static T Deserialize<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(byte[] buffer)
+        where T : ISerializable
+    {
+        using MemoryStream stream = new(buffer);
+        using BinaryReader reader = new(stream);
+        T data = Activator.CreateInstance<T>();
+        data.Deserialize(reader);
+        return data;
     }
 
     public static T Deserialize<T>(T data, byte[] buffer)
@@ -152,26 +165,7 @@ public static partial class Utils
 
 public static class Extensions
 {
-    public static void UpdateAll<T>(this List<T> entities)
-        where T : Entity
-    {
-        for (int i = entities.Count - 1; i >= 0; i--)
-        {
-            T entity = entities[i];
-            if (entity.DoesExist) entity.Update();
-            else if (Game.IsServer) entities.RemoveAt(i);
-        }
-    }
-
-    public static void RenderAll<T>(this List<T> entities)
-        where T : Entity
-    {
-        for (int i = 0; i < entities.Count; i++)
-        {
-            T entity = entities[i];
-            if (entity.DoesExist) entity.Render();
-        }
-    }
+    #region Random
 
     public static float NextSingle(this Random random, float min, float max)
         => (random.NextSingle() * (max - min)) + min;
@@ -183,4 +177,51 @@ public static class Extensions
     public static Vector2 NextVector2(this Random random, Vector2 min, Vector2 max) => new(
         random.NextSingle(min.X, max.X),
         random.NextSingle(min.Y, max.Y));
+
+    #endregion
+
+    #region Serializing
+
+    public static void Write(this BinaryWriter writer, Vector2 value)
+    {
+        writer.Write(value.X);
+        writer.Write(value.Y);
+    }
+
+    public static Vector2 ReadVector2(this BinaryReader reader)
+    {
+        Vector2 value = default;
+        value.X = reader.ReadSingle();
+        value.Y = reader.ReadSingle();
+        return value;
+    }
+
+    public static void Write(this BinaryWriter writer, IPAddress value)
+    {
+        byte[] bytes = value.GetAddressBytes();
+        writer.Write(checked((byte)bytes.Length));
+        writer.Write(bytes);
+    }
+
+    public static IPAddress ReadIPAddress(this BinaryReader reader)
+    {
+        byte length = reader.ReadByte();
+        byte[] buffer = reader.ReadBytes(length);
+        return new IPAddress(buffer);
+    }
+
+    public static void Write(this BinaryWriter writer, IPEndPoint value)
+    {
+        writer.Write(value.Address);
+        writer.Write(checked((ushort)value.Port));
+    }
+
+    public static IPEndPoint ReadIPEndPoint(this BinaryReader reader)
+    {
+        IPAddress address = reader.ReadIPAddress();
+        ushort port = reader.ReadUInt16();
+        return new IPEndPoint(address, port);
+    }
+
+    #endregion
 }
