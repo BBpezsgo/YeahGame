@@ -73,7 +73,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     readonly ConcurrentQueue<UdpMessage> IncomingQueue;
     readonly Queue<Message> OutgoingQueue;
 
-    readonly ConcurrentDictionary<string, UdpClient<T>> Connections;
+    public ICollection<string> Connections => _connections.Keys;
+    readonly ConcurrentDictionary<string, UdpClient<T>> _connections;
 
     public IReadOnlyDictionary<string, (T Info, bool IsServer)> PlayerInfos => _playerInfos;
     readonly Dictionary<string, (T Info, bool IsServer)> _playerInfos;
@@ -113,7 +114,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     [MemberNotNullWhen(true, nameof(UdpSocket))]
     public bool IsConnected => UdpSocket != null;
 
-    public IReadOnlyList<IPEndPoint> Clients => Connections.Values
+    public IReadOnlyList<IPEndPoint> Clients => _connections.Values
         .Select(client => client.EndPoint)
         .ToList();
 
@@ -122,7 +123,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         IncomingQueue = new ConcurrentQueue<UdpMessage>();
         OutgoingQueue = new Queue<Message>();
 
-        Connections = new ConcurrentDictionary<string, UdpClient<T>>();
+        _connections = new ConcurrentDictionary<string, UdpClient<T>>();
 
         _playerInfos = new Dictionary<string, (T, bool)>();
 
@@ -171,10 +172,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
                 if (isServer)
                 {
-                    if (!Connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
+                    if (!_connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
                     {
                         client = new UdpClient<T>(source, default);
-                        Connections.TryAdd(source.ToString(), client);
+                        _connections.TryAdd(source.ToString(), client);
                         OnClientConnected?.Invoke(source, ConnectingPhase.Connected);
                     }
 
@@ -201,7 +202,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     public void Close()
     {
         ShouldListen = false;
-        Connections.Clear();
+        _connections.Clear();
         UdpSocket?.Close();
         UdpSocket?.Dispose();
         UdpSocket = null;
@@ -216,7 +217,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     {
         if (!IsConnected) return;
 
-        if (Connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
+        if (_connections.TryGetValue(source.ToString(), out UdpClient<T>? client))
         { client.ReceivedAt = Time.NowNoCache; }
 
         switch (netControlMessage.Kind)
@@ -273,7 +274,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
         List<string> shouldRemove = new();
 
-        foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
+        foreach (KeyValuePair<string, UdpClient<T>> client in _connections)
         {
             while (client.Value.OutgoingQueue.TryDequeue(out byte[]? messageOut) && IsConnected)
             {
@@ -303,7 +304,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
         for (int i = 0; i < shouldRemove.Count; i++)
         {
-            if (Connections.TryRemove(shouldRemove[i], out UdpClient<T>? removedClient))
+            if (_connections.TryRemove(shouldRemove[i], out UdpClient<T>? removedClient))
             { OnClientDisconnected?.Invoke(removedClient.EndPoint); }
         }
 
@@ -479,7 +480,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in _connections)
             {
                 UdpSocket.Send(data, data.Length, client.Value.EndPoint);
             }
@@ -497,7 +498,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in _connections)
             {
                 if (!client.Value.EndPoint.Equals(destination)) continue;
 
@@ -523,7 +524,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         SentAt = Time.NowNoCache;
         if (isServer)
         {
-            foreach (KeyValuePair<string, UdpClient<T>> client in Connections)
+            foreach (KeyValuePair<string, UdpClient<T>> client in _connections)
             {
                 if (!client.Value.EndPoint.Equals(destination)) continue;
 

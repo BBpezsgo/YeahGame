@@ -5,13 +5,14 @@ namespace YeahGame;
 public class Player : NetworkEntity
 {
     const float Speed = 10;
+    const float UsernameHoverDistance = 5f;
+    const float NetPositionThreshold = .5f;
 
     public float HP = 1;
     public string? Owner;
 
     float LastShot = Time.Now;
     Vector2 NetPosition;
-    const float NetPositionThreshold = .5f;
 
     public override EntityPrototype Prototype => EntityPrototype.Player;
 
@@ -101,7 +102,10 @@ public class Player : NetworkEntity
         if (!Game.Renderer.IsVisible(Position)) return;
         Game.Renderer[Position] = (ConsoleChar)'○';
 
-        if (Owner is not null && Game.Connection.LocalAddress?.ToString() != Owner && Game.Connection.PlayerInfos.TryGetValue(Owner, out (PlayerInfo Info, bool IsServer) info))
+        if (Owner is not null &&
+            Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance &&
+            Game.Connection.LocalAddress?.ToString() != Owner &&
+            Game.Connection.PlayerInfos.TryGetValue(Owner, out (PlayerInfo Info, bool IsServer) info))
         {
             Game.Renderer.Text(Position.Round() + new Vector2Int(0, 1), info.Info.Username);
         }
@@ -128,6 +132,9 @@ public class Player : NetworkEntity
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);
         Position = reader.ReadVector2();
+
+        if (Game.Connection.IsServer)
+        { Game.Connection.Send(message); }
     }
 
     public override void HandleRPC(RPCMessage message)
@@ -155,6 +162,9 @@ public class Player : NetworkEntity
         {
             Damage(reader.ReadSingle());
         }
+
+        if (Game.Connection.IsServer)
+        { Game.Connection.Send(message); }
     }
 
     public override void NetworkSerialize(BinaryWriter writer)

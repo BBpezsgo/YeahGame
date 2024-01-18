@@ -49,7 +49,7 @@ public class Tester : NetworkEntity
     public override void Render()
     {
         if (Game.Renderer.IsVisible(Position)) Game.Renderer[Position] = (ConsoleChar)'o';
-        if (Game.Renderer.IsVisible(Target)) Game.Renderer[Target] = new ConsoleChar('x', CharColor.BrightBlue);
+        // if (Game.Renderer.IsVisible(Target)) Game.Renderer[Target] = new ConsoleChar('x', CharColor.BrightBlue);
     }
 
     public override void Update()

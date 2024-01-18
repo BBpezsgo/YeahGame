@@ -20,9 +20,12 @@ public class GameScene : Scene
     readonly WeakList<NetworkEntity> _networkEntities = new();
     readonly List<Entity> _entities = new();
 
-    readonly Dictionary<string, float> _respawnTimers = new();
+    const float RespawnTime = 5f;
 
-    public readonly bool[] Map;
+    readonly Dictionary<string, float> _respawnTimers = new();
+    float _localRespawnTimer;
+
+    public readonly bool[]? Map;
     public readonly int MapWidth;
     public readonly int MapHeight;
 
@@ -33,8 +36,8 @@ public class GameScene : Scene
 
     public GameScene()
     {
-        Map = Utils.LoadMap(File.ReadAllText("map.txt"), out MapWidth);
-        MapHeight = Map.Length / MapWidth;
+        // Map = Utils.LoadMap(File.ReadAllText("map.txt"), out MapWidth);
+        // MapHeight = Map.Length / MapWidth;
     }
 
     public override void Load()
@@ -43,14 +46,21 @@ public class GameScene : Scene
 
         if (Game.IsServer)
         {
-            for (int i = 0; i < 5; i++)
+            SpawnEntity(new Player()
             {
-                AddEntity(new Tester()
-                {
-                    NetworkId = GenerateNetworkId(),
-                    Position = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(MapWidth, MapHeight)),
-                });
-            }
+                Owner = Game.Connection.LocalAddress!.ToString(),
+                NetworkId = GenerateNetworkId(),
+                Position = new Vector2(10, 5),
+            });
+
+            // for (int i = 0; i < 5; i++)
+            // {
+            //     AddEntity(new Tester()
+            //     {
+            //         NetworkId = GenerateNetworkId(),
+            //         Position = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(MapWidth, MapHeight)),
+            //     });
+            // }
         }
     }
 
@@ -61,6 +71,17 @@ public class GameScene : Scene
 
     public override void Render()
     {
+        if (Map is not null)
+        {
+            for (int i = 0; i < Map.Length; i++)
+            {
+                int x = i % MapWidth;
+                int y = i / MapWidth;
+                if (Game.Renderer.IsVisible(x, y) && Map[i])
+                { Game.Renderer[x, y] = (ConsoleChar)Ascii.Blocks.Full; }
+            }
+        }
+
         for (int i = 0; i < _entities.Count; i++)
         {
             Entity entity = _entities[i];
@@ -94,6 +115,20 @@ public class GameScene : Scene
                 }
             }
         }
+
+        if (!TryGetLocalPlayer(out _))
+        {
+            SmallRect box = Layout.Center(new Coord(50, 7), new SmallRect(default, Game.Renderer.Rect));
+
+            Game.Renderer.Fill(box, CharColor.Black, CharColor.Black, ' ');
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            
+            ReadOnlySpan<char> text1 = "YOU DIED";
+            Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text1), box.Top + 2, text1, CharColor.BrightRed);
+
+            ReadOnlySpan<char> text2 = $"Respawn in {RespawnTime - (Time.Now - _localRespawnTimer):0.0} sec ...";
+            Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text2), box.Top + 4, text2, CharColor.White);
+        }
     }
 
     public override void Tick()
@@ -113,25 +148,55 @@ public class GameScene : Scene
             });
         }
 
-        if (!TryGetLocalPlayer(out _))
+        if (Game.IsServer)
         {
-            SmallRect box = Layout.Center(new Coord(50, 7), new SmallRect(default, Game.Renderer.Rect));
+            foreach (string client in Game.Connection.Connections)
+            {
+                if (TryGetPlayer(client, out _))
+                {
+                    _respawnTimers.Remove(client);
+                }
+                else if (!_respawnTimers.TryAdd(client, Time.Now) &&
+                         Time.Now - _respawnTimers[client] > RespawnTime)
+                {
+                    SpawnEntity(new Player()
+                    {
+                        Owner = client,
+                        NetworkId = GenerateNetworkId(),
+                        Position = new Vector2(10, 5),
+                    });
+                }
+            }
 
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
-            Game.Renderer.Text(box.Left + 2, box.Top + 2, "YOU DIED", CharColor.BrightRed);
+            {
+                string local = Game.Connection.LocalAddress!.ToString();
+                if (TryGetLocalPlayer(out _))
+                {
+                    _respawnTimers.Remove(local);
+                }
+                else if (!_respawnTimers.TryAdd(local, Time.Now) &&
+                         Time.Now - _respawnTimers[local] > RespawnTime)
+                {
+                    SpawnEntity(new Player()
+                    {
+                        Owner = local,
+                        NetworkId = GenerateNetworkId(),
+                        Position = new Vector2(10, 5),
+                    });
+                }
+            }
         }
 
-        if (!TryGetLocalPlayer(out _) &&
-            Game.IsServer &&
-            Game.Connection.IsConnected)
+        if (!TryGetLocalPlayer(out _))
         {
-            Player player = new()
+            if (_localRespawnTimer == 0f)
             {
-                Owner = Game.Connection.LocalAddress!.ToString(),
-                NetworkId = GenerateNetworkId(),
-                Position = new Vector2(10, 5),
-            };
-            SpawnEntity(player);
+                _localRespawnTimer = Time.Now;
+            }
+        }
+        else
+        {
+            _localRespawnTimer = 0f;
         }
 
         for (int i = _entities.Count - 1; i >= 0; i--)
@@ -144,17 +209,10 @@ public class GameScene : Scene
             }
         }
 
-        for (int i = 0; i < Map.Length; i++)
-        {
-            int x = i % MapWidth;
-            int y = i / MapWidth;
-            if (Game.Renderer.IsVisible(x, y) && Map[i])
-            { Game.Renderer[x, y] = (ConsoleChar)Ascii.Blocks.Full; }
-        }
-
         if (ShouldSync)
         { lastNetworkSync = Time.Now; }
     }
+
     public int GenerateNetworkId()
     {
         int id = 1;
@@ -255,18 +313,24 @@ public class GameScene : Scene
     }
 
     public bool TryGetLocalPlayer([NotNullWhen(true)] out Player? player)
+        => TryGetPlayer(Game.Connection.LocalAddress?.ToString(), out player);
+
+    public bool TryGetPlayer(string? owner, [NotNullWhen(true)] out Player? player)
     {
+        player = null;
+
+        if (owner == null) return false;
+
         for (int i = 0; i < Players.Count; i++)
         {
             Player? _player = Players[i];
-            if (_player != null && _player.Owner == Game.Connection.LocalAddress?.ToString())
+            if (_player != null && _player.Owner == owner)
             {
                 player = _player;
                 return true;
             }
         }
 
-        player = null;
         return false;
     }
 
@@ -304,14 +368,23 @@ public class GameScene : Scene
             else
             {
                 if (Game.IsServer)
-                { throw new NotImplementedException(); }
-
-                Game.Connection.Send(new ObjectControlMessage()
                 {
-                    ObjectId = objectMessage.ObjectId,
-                    Kind = ObjectControlMessageKind.NotFound,
-                });
-                Debug.WriteLine($"[Net]: Object {objectMessage.ObjectId} not found ...");
+                    Game.Connection.SendTo(new ObjectControlMessage()
+                    {
+                        ObjectId = objectMessage.ObjectId,
+                        Kind = ObjectControlMessageKind.Destroy,
+                    }, source);
+                    Debug.WriteLine($"[Net]: Client {source} sent obj sync that doesnt exists ...");
+                }
+                else
+                {
+                    Game.Connection.Send(new ObjectControlMessage()
+                    {
+                        ObjectId = objectMessage.ObjectId,
+                        Kind = ObjectControlMessageKind.NotFound,
+                    });
+                    Debug.WriteLine($"[Net]: Object {objectMessage.ObjectId} not found ...");
+                }
             }
 
             return;

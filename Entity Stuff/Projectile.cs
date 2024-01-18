@@ -42,8 +42,12 @@ public class Projectile : Entity
             out Vector2 intersection,
             (x, y) =>
             {
+                if (Game.Singleton.GameScene.Map is null)
+                { return false; }
+
                 if (x < 0 || y < 0 || x >= Game.Singleton.GameScene.MapWidth || y >= Game.Singleton.GameScene.MapHeight)
                 { return false; }
+
                 return Game.Singleton.GameScene.Map[x + y * Game.Singleton.GameScene.MapWidth];
             });
 
