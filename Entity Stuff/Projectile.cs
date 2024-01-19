@@ -3,7 +3,6 @@
 public class Projectile : Entity
 {
     public const float Speed = 25f;
-
     public const int Damage = 1;
 
     public Vector2 Velocity;
