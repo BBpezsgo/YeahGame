@@ -21,10 +21,7 @@ public class InfoResponseMessage : Message
     {
         base.Deserialize(reader);
         IsServer = reader.ReadBoolean();
-        if (reader.ReadByte() == 0)
-        { Source = null; }
-        else
-        { Source = reader.ReadIPEndPoint(); }
+        Source = reader.ReadNullable(reader.ReadIPEndPoint);
         int detailsLength = reader.ReadInt32();
         Details = reader.ReadBytes(detailsLength);
     }
@@ -33,15 +30,7 @@ public class InfoResponseMessage : Message
     {
         base.Serialize(writer);
         writer.Write(IsServer);
-        if (Source is null)
-        {
-            writer.Write((byte)0);
-        }
-        else
-        {
-            writer.Write((byte)1);
-            writer.Write(Source);
-        }
+        writer.WriteNullable(Source, writer.Write);
         writer.Write(Details.Length);
         writer.Write(Details);
     }

@@ -17,27 +17,14 @@ public class InfoRequestMessage : Message
     {
         base.Serialize(writer);
         writer.Write(FromServer);
-        if (From is null)
-        {
-            writer.Write((byte)0);
-        }
-        else
-        {
-            writer.Write((byte)1);
-            writer.Write(From.ToString());
-        }
+        writer.WriteNullable(From, writer.Write);
     }
 
     public override void Deserialize(BinaryReader reader)
     {
         base.Deserialize(reader);
         FromServer = reader.ReadBoolean();
-        bool isNull = reader.ReadByte() == 0;
-        if (!isNull)
-        {
-            string from = reader.ReadString();
-            From = IPEndPoint.Parse(from);
-        }
+        From = reader.ReadNullable(reader.ReadIPEndPoint);
     }
 
     public override string ToString() => $"{{ {FromServer} {(From is null ? "null" : From.ToString())} }} {base.ToString()}";

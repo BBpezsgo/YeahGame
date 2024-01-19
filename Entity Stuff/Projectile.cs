@@ -4,6 +4,7 @@ public class Projectile : Entity
 {
     public const float Speed = 25f;
     public const int Damage = 1;
+    public const float Lifetime = 5f;
 
     public Vector2 Velocity;
     public float SpawnedAt;
@@ -22,9 +23,7 @@ public class Projectile : Entity
 
     public override void Update()
     {
-        float lifetime = Time.Now - SpawnedAt;
-
-        if (lifetime > 5)
+        if (Time.Now - SpawnedAt > Lifetime)
         {
             DoesExist = false;
             return;

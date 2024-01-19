@@ -81,31 +81,13 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     #endregion
 
+    #region Public Properties
+
     public T? LocalUserInfo;
 
-    readonly ConcurrentQueue<UdpMessage> IncomingQueue;
-    readonly Queue<Message> OutgoingQueue;
-
     public IReadOnlyList<IPEndPoint> DiscoveredServers => _discoveredServers;
-    readonly List<IPEndPoint> _discoveredServers = new();
-
     public ICollection<string> Connections => _connections.Keys;
-    readonly ConcurrentDictionary<string, UdpClient<T>> _connections;
-
     public IReadOnlyDictionary<string, (T Info, bool IsServer)> PlayerInfos => _playerInfos;
-    readonly Dictionary<string, (T Info, bool IsServer)> _playerInfos;
-
-    public double ReceivedAt;
-    public double SentAt;
-
-    float _lastDiscoveryBroadcast;
-
-    UdpClient? UdpSocket;
-    Thread? ListeningThread;
-    bool isServer;
-    bool justListen;
-
-    bool ShouldListen;
 
     public IPEndPoint? RemoteEndPoint
     {
@@ -136,6 +118,33 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     public IReadOnlyList<IPEndPoint> Clients => _connections.Values
         .Select(client => client.EndPoint)
         .ToList();
+
+    #endregion
+
+    #region Fields
+
+    readonly ConcurrentQueue<UdpMessage> IncomingQueue;
+    readonly Queue<Message> OutgoingQueue;
+
+    readonly List<IPEndPoint> _discoveredServers = new();
+
+    readonly ConcurrentDictionary<string, UdpClient<T>> _connections;
+
+    readonly Dictionary<string, (T Info, bool IsServer)> _playerInfos;
+
+    double ReceivedAt;
+    double SentAt;
+
+    float _lastDiscoveryBroadcast;
+
+    UdpClient? UdpSocket;
+    Thread? ListeningThread;
+    bool isServer;
+    bool justListen;
+
+    bool ShouldListen;
+
+    #endregion
 
     public Connection()
     {

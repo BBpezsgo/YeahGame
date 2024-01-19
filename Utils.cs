@@ -223,5 +223,31 @@ public static class Extensions
         return new IPEndPoint(address, port);
     }
 
+    public static void WriteNullable<T>(this BinaryWriter _writer, T? value, Action<T> writer)
+    {
+        if (value != null)
+        {
+            _writer.Write((byte)1);
+            writer.Invoke(value);
+        }
+        else
+        {
+            _writer.Write((byte)0);
+        }
+    }
+
+    public static T? ReadNullable<T>(this BinaryReader _reader, Func<T> reader)
+    {
+        byte notNull = _reader.ReadByte();
+        if (notNull != 0)
+        {
+            return reader.Invoke();
+        }
+        else
+        {
+            return default;
+        }
+    }
+
     #endregion
 }

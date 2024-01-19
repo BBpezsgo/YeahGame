@@ -9,6 +9,7 @@ public class Player : NetworkEntity
     const float NetPositionThreshold = .5f;
     const float NetPositionMaxSleep = 3f;
     const float ReloadTime = .5f;
+    static readonly float InverseSqrt2 = 1f / MathF.Sqrt(2f);
 
     public bool IsLocalOwned => Game.Connection.LocalEndPoint?.ToString() == Owner;
     public override EntityPrototype Prototype => EntityPrototype.Player;
@@ -24,10 +25,25 @@ public class Player : NetworkEntity
     {
         if (!IsLocalOwned) return;
 
-        if (Keyboard.IsKeyPressed('W')) Position.Y -= Speed * 0.5f * Time.Delta;
-        if (Keyboard.IsKeyPressed('S')) Position.Y += Speed * 0.5f * Time.Delta;
-        if (Keyboard.IsKeyPressed('A')) Position.X -= Speed * Time.Delta;
-        if (Keyboard.IsKeyPressed('D')) Position.X += Speed * Time.Delta;
+        {
+            Vector2 velocity = default;
+
+            if (Keyboard.IsKeyPressed('W')) velocity.Y = -1f;
+            if (Keyboard.IsKeyPressed('S')) velocity.Y = +1f;
+            if (Keyboard.IsKeyPressed('A')) velocity.X = -1f;
+            if (Keyboard.IsKeyPressed('D')) velocity.X = +1f;
+
+            if (velocity != default)
+            {
+                if (velocity.X != 0f && velocity.Y != 0f)
+                {
+                    velocity.X = (velocity.X < 0f) ? -InverseSqrt2 : +InverseSqrt2;
+                    velocity.Y = (velocity.Y < 0f) ? -InverseSqrt2 : +InverseSqrt2;
+                }
+                velocity.Y *= .5f;
+                Position += velocity * (Speed * Time.Delta);
+            }
+        }
 
         Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
         Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);

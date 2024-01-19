@@ -15,6 +15,18 @@ public class GameScene : Scene
     public override string Name => "Game";
 
 
+    public readonly bool[]? Map;
+    public readonly int MapWidth;
+    public readonly int MapHeight;
+
+    public bool ShouldSync => Time.Now - LastNetworkSync >= SyncInterval;
+
+    public IReadOnlyList<Player?> Players => _players;
+    public IReadOnlyList<Projectile?> Projectiles => _projectiles;
+    public IReadOnlyList<NetworkEntity?> NetworkEntities => _networkEntities;
+    public IReadOnlyList<Entity> Entities => _entities;
+
+
     float LastPlayerInfoSync;
 
     float LastNetworkSync;
@@ -28,18 +40,6 @@ public class GameScene : Scene
     readonly WeakList<Projectile> _projectiles = new();
     readonly WeakList<NetworkEntity> _networkEntities = new();
     readonly List<Entity> _entities = new();
-
-
-    public readonly bool[]? Map;
-    public readonly int MapWidth;
-    public readonly int MapHeight;
-
-    public bool ShouldSync => Time.Now - LastNetworkSync >= SyncInterval;
-
-    public IReadOnlyList<Player?> Players => _players;
-    public IReadOnlyList<Projectile?> Projectiles => _projectiles;
-    public IReadOnlyList<NetworkEntity?> NetworkEntities => _networkEntities;
-    public IReadOnlyList<Entity> Entities => _entities;
 
 
     public GameScene()
@@ -231,37 +231,7 @@ public class GameScene : Scene
         { LastNetworkSync = Time.Now; }
     }
 
-    public int GenerateNetworkId()
-    {
-        int id = NetworkIdCounter++;
-        while (TryGetNetworkEntity(id, out _))
-        { id++; }
-        return id;
-    }
-
-    Vector2 GetSpawnPoint()
-    {
-        return Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(10f, 10f));
-    }
-
-    public static NetworkEntity GenerateNetworkEntity(ObjectControlMessage message)
-        => GenerateNetworkEntity(message.EntityPrototype, message.ObjectId, message.Details);
-
-    public static NetworkEntity GenerateNetworkEntity(EntityPrototype prototype, int networkId, byte[] details)
-    {
-        NetworkEntity result = prototype switch
-        {
-            EntityPrototype.Player => new Player(),
-            EntityPrototype.Tester => new Tester(),
-            _ => throw new NotImplementedException(),
-        };
-
-        result.NetworkId = networkId;
-
-        Utils.Deserialize(details, result.NetworkDeserialize);
-
-        return result;
-    }
+    #region Entity Management
 
     public bool DestroyEntity(Entity entity)
     {
@@ -359,6 +329,10 @@ public class GameScene : Scene
 
         return false;
     }
+
+    #endregion
+
+    #region Networking
 
     public void OnClientDisconnected(IPEndPoint client)
     {
@@ -563,4 +537,42 @@ public class GameScene : Scene
             return;
         }
     }
+
+    public int GenerateNetworkId()
+    {
+        int id = NetworkIdCounter++;
+        while (TryGetNetworkEntity(id, out _))
+        { id++; }
+        return id;
+    }
+
+    public static NetworkEntity GenerateNetworkEntity(ObjectControlMessage message)
+        => GenerateNetworkEntity(message.EntityPrototype, message.ObjectId, message.Details);
+
+    public static NetworkEntity GenerateNetworkEntity(EntityPrototype prototype, int networkId, byte[] details)
+    {
+        NetworkEntity result = prototype switch
+        {
+            EntityPrototype.Player => new Player(),
+            EntityPrototype.Tester => new Tester(),
+            _ => throw new NotImplementedException(),
+        };
+
+        result.NetworkId = networkId;
+
+        Utils.Deserialize(details, result.NetworkDeserialize);
+
+        return result;
+    }
+
+    #endregion
+
+    #region Utils
+
+    Vector2 GetSpawnPoint()
+    {
+        return Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(10f, 10f));
+    }
+
+    #endregion
 }
