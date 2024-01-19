@@ -8,19 +8,23 @@ public abstract class NetworkEntity : Entity
 
     public abstract EntityPrototype Prototype { get; }
 
-    public abstract void HandleMessage(ObjectSyncMessage message);
-
     public abstract void NetworkSerialize(BinaryWriter writer);
     public abstract void NetworkDeserialize(BinaryReader reader);
 
-    protected void SendSyncMessage(byte[] details)
+    protected void SyncUp()
     {
+        if (!Game.Singleton.GameScene.ShouldSync) return;
+
+        byte[] data = Utils.Serialize(SyncUp);
+        if (data.Length == 0) return;
         Game.Connection.Send(new ObjectSyncMessage()
         {
-            Details = details,
+            Details = data,
             ObjectId = NetworkId,
         });
     }
+    protected abstract void SyncUp(BinaryWriter writer);
+    public abstract void SyncDown(ObjectSyncMessage message, System.Net.IPEndPoint source);
 
     public abstract void HandleRPC(RPCMessage rpcMessage);
 }

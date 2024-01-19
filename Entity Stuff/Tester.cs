@@ -10,7 +10,7 @@ public class Tester : NetworkEntity
 
     #region Networking
 
-    public override void HandleMessage(ObjectSyncMessage message)
+    public override void SyncDown(ObjectSyncMessage message, System.Net.IPEndPoint source)
     {
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);
@@ -33,15 +33,9 @@ public class Tester : NetworkEntity
 
     }
 
-    void Sync()
+    protected override void SyncUp(BinaryWriter writer)
     {
-        if (!Game.Singleton.GameScene.ShouldSync) return;
-
-        SendSyncMessage(Utils.Serialize(writer =>
-        {
-            writer.Write(Position.X);
-            writer.Write(Position.Y);
-        }));
+        writer.Write(Position);
     }
 
     #endregion
@@ -56,7 +50,6 @@ public class Tester : NetworkEntity
     {
         if (Game.IsServer)
         {
-
             if (Vector2.Distance(Position, Target) < 1f)
             {
                 Target = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(Game.Singleton.GameScene.MapWidth, Game.Singleton.GameScene.MapHeight));
@@ -69,7 +62,7 @@ public class Tester : NetworkEntity
                 Position += dir;
             }
 
-            Sync();
+            SyncUp();
         }
     }
 }

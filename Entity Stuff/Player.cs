@@ -7,35 +7,34 @@ public class Player : NetworkEntity
     const float Speed = 10;
     const float UsernameHoverDistance = 5f;
     const float NetPositionThreshold = .5f;
+    const float NetPositionMaxSleep = 3f;
+    const float ReloadTime = .5f;
+
+    public bool IsLocalOwned => Game.Connection.LocalEndPoint?.ToString() == Owner;
+    public override EntityPrototype Prototype => EntityPrototype.Player;
 
     public float HP = 1;
     public string? Owner;
-
     float LastShot = Time.Now;
-    Vector2 NetPosition;
 
-    public override EntityPrototype Prototype => EntityPrototype.Player;
+    Vector2 NetPosition;
+    float LastNetPositionTime;
 
     public override void Update()
     {
-        if (Game.Singleton.GameScene.TryGetLocalPlayer(out Player? localPlayer) &&
-            localPlayer == this)
+        if (IsLocalOwned)
         {
-            // Movement
             if (Keyboard.IsKeyPressed('W')) Position.Y -= Speed * 0.5f * Time.Delta;
             if (Keyboard.IsKeyPressed('S')) Position.Y += Speed * 0.5f * Time.Delta;
             if (Keyboard.IsKeyPressed('A')) Position.X -= Speed * Time.Delta;
             if (Keyboard.IsKeyPressed('D')) Position.X += Speed * Time.Delta;
 
-            // Keep inside the world borders
             Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
             Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
 
-            // Shooting
             if (Mouse.IsPressed(MouseButton.Left) &&
-                Time.Now - LastShot > 0.5f)
+                Time.Now - LastShot >= ReloadTime)
             {
-                // Calculate projectile direction
                 Vector2 velocity = Mouse.RecordedConsolePosition - Position;
                 velocity *= new Vector2(1f, 2f);
                 velocity = Vector2.Normalize(velocity);
@@ -56,21 +55,18 @@ public class Player : NetworkEntity
                     velocity *= Projectile.Speed;
                     velocity *= new Vector2(1, 0.5f);
 
-                    Projectile newProjectile = new(this)
+                    Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
                     {
                         Position = Position,
                         Velocity = velocity,
                         SpawnedAt = Time.Now
-                    };
-                    Game.Singleton.GameScene.AddEntity(newProjectile);
-
+                    });
                 }
 
                 LastShot = Time.Now;
             }
 
-            // Network sync
-            Sync();
+            SyncUp();
         }
     }
 
@@ -90,21 +86,17 @@ public class Player : NetworkEntity
 
             HP -= amount;
             if (HP <= 0)
-            {
-                DoesExist = false;
-                // Menu
-            }
+            { DoesExist = false; }
         }
     }
 
     public override void Render()
     {
         if (!Game.Renderer.IsVisible(Position)) return;
-        Game.Renderer[Position] = (ConsoleChar)'○';
+        Game.Renderer[Position] = new ConsoleChar('○', IsLocalOwned ? CharColor.BrightMagenta : CharColor.White);
 
         if (Owner is not null &&
             Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance &&
-            Game.Connection.LocalAddress?.ToString() != Owner &&
             Game.Connection.PlayerInfos.TryGetValue(Owner, out (PlayerInfo Info, bool IsServer) info))
         {
             Game.Renderer.Text(Position.Round() + new Vector2Int(0, 1), info.Info.Username);
@@ -113,28 +105,25 @@ public class Player : NetworkEntity
 
     #region Networking
 
-    void Sync()
+    protected override void SyncUp(BinaryWriter writer)
     {
-        if (!Game.Singleton.GameScene.ShouldSync) return;
-
-        if (Vector2.DistanceSquared(NetPosition, Position) >= NetPositionThreshold * NetPositionThreshold)
+        if (Vector2.DistanceSquared(NetPosition, Position) >= NetPositionThreshold * NetPositionThreshold ||
+            Time.Now - LastNetPositionTime > NetPositionMaxSleep)
         {
+            LastNetPositionTime = Time.Now;
             NetPosition = Position;
-            SendSyncMessage(Utils.Serialize(writer =>
-            {
-                writer.Write(Position);
-            }));
+            writer.Write(Position);
         }
     }
 
-    public override void HandleMessage(ObjectSyncMessage message)
+    public override void SyncDown(ObjectSyncMessage message, System.Net.IPEndPoint source)
     {
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);
         Position = reader.ReadVector2();
 
         if (Game.Connection.IsServer)
-        { Game.Connection.Send(message); }
+        { Game.Connection.SendExpect(message, source); }
     }
 
     public override void HandleRPC(RPCMessage message)
@@ -150,13 +139,12 @@ public class Player : NetworkEntity
             velocity *= Projectile.Speed;
             velocity *= new Vector2(1, 0.5f);
 
-            Projectile newProjectile = new(this)
+            Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
             {
                 Position = projectilePosition,
                 Velocity = velocity,
                 SpawnedAt = Time.Now
-            };
-            Game.Singleton.GameScene.AddEntity(newProjectile);
+            });
         }
         else if (message.RPCId == 2)
         {

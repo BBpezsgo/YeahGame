@@ -67,10 +67,16 @@ public class Game
     {
         for (int i = 0; i < Scenes.Count; i++)
         {
-            if (Scenes[i].Name == name)
-            { if (!Scenes[i].IsLoaded) Scenes[i].Load(); }
-            else
-            { if (Scenes[i].IsLoaded) Scenes[i].Unload(); }
+            if (Scenes[i].Name != name &&
+                Scenes[i].IsLoaded)
+            { Scenes[i].Unload(); }
+        }
+
+        for (int i = 0; i < Scenes.Count; i++)
+        {
+            if (Scenes[i].Name == name &&
+                !Scenes[i].IsLoaded)
+            { Scenes[i].Load(); }
         }
     }
 
@@ -137,7 +143,7 @@ public class Game
 
     }
 
-    void OnClientConnected(IPEndPoint client, Connection<PlayerInfo>.ConnectingPhase phase)
+    void OnClientConnected(IPEndPoint client, Connection.ConnectingPhase phase)
     {
 
     }

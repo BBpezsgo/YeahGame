@@ -65,19 +65,11 @@ public class Projectile : Entity
             Vector2 p = Utils.Point2LineDistance(lastPos, Position, entity.Position);
             if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
             {
-                hit = true;
-                if (entity is Player player)
-                {
-                    player.Damage(Damage);
-                }
-                break;
-            }
-        }
+                if (entity is Player player) player.Damage(Damage);
 
-        if (hit)
-        {
-            DoesExist = false;
-            return;
+                DoesExist = false;
+                return;
+            }
         }
     }
 }
