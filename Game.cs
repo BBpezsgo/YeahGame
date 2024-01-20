@@ -40,7 +40,7 @@ public class Game
     readonly ConsoleDropdown _receivedBytesDropdown = new();
     readonly ConsoleDropdown _memoryDropdown = new();
 
-    readonly ConsolePanel _debugPanel = new(new SmallRect(1, 1, 30, 25));
+    readonly ConsolePanel _debugPanel = new(new SmallRect(1, 1, 30, 2));
 
     float _lastConnectionCounterReset;
     Graph _sentBytes;
@@ -116,20 +116,6 @@ public class Game
 
     public void Start(string[] args)
     {
-        bool wasResized = false;
-
-        Console.WindowWidth = 80;
-        Console.BufferWidth = 80;
-        Console.WindowHeight = 30;
-        Console.BufferHeight = 30;
-
-        ConsoleListener.KeyEvent += Keyboard.Feed;
-        ConsoleListener.MouseEvent += Mouse.Feed;
-        ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
-
-        ConsoleListener.Start();
-        ConsoleHandler.Setup();
-
         static void WriteError(string error)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -144,19 +130,33 @@ public class Game
                 if (i + 1 > args.Length)
                 {
                     WriteError($"Expected socket after \"--host\"");
-                    continue;
+                    return;
                 }
 
                 if (!MenuScene.TryParseSocket(args[i + 1], out System.Net.IPAddress? address, out ushort port, out string? error))
                 {
                     WriteError(error);
-                    continue;
+                    return;
                 }
 
                 _connection.StartHost(address, port);
                 continue;
             }
         }
+
+        bool wasResized = false;
+
+        Console.WindowWidth = 80;
+        Console.BufferWidth = 80;
+        Console.WindowHeight = 30;
+        Console.BufferHeight = 30;
+
+        ConsoleListener.KeyEvent += Keyboard.Feed;
+        ConsoleListener.MouseEvent += Mouse.Feed;
+        ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
+
+        ConsoleListener.Start();
+        ConsoleHandler.Setup();
 
         while (true)
         {

@@ -97,7 +97,7 @@ public class Player : NetworkEntity
             Details = Utils.Serialize(writer =>
             {
                 writer.Write(amount);
-            })
+            }),
         });
 
         HP -= amount;

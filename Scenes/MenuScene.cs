@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using Win32.Common;
 
 namespace YeahGame;
 
@@ -29,7 +30,7 @@ public class MenuScene : Scene
     {
         if (ExitReason is not null)
         {
-            SmallRect box = Layout.Center(new Coord(30, 6), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(30, 6), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
             box = box.Margin(1);
@@ -44,7 +45,7 @@ public class MenuScene : Scene
         }
         else if (Game.Connection.State != ConnectionState.None)
         {
-            SmallRect box = Layout.Center(new Coord(30, 4), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(30, 4), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
             box = box.Margin(1);
@@ -61,7 +62,7 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallRect box = Layout.Center(new Coord(30, 11), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(30, 11), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
 
@@ -83,7 +84,7 @@ public class MenuScene : Scene
 
             if (Game.Renderer.Button(
                 Layout.Center(
-                    new Coord(10, 1),
+                    new SmallSize(10, 1),
                     new SmallRect(box.Left, box.Top + 7, box.Width, 1)
                     ),
                 "Connect",
@@ -108,7 +109,7 @@ public class MenuScene : Scene
 
             if (Game.Renderer.Button(
                 Layout.Center(
-                    new Coord(10, 1),
+                    new SmallSize(10, 1),
                     new SmallRect(box.Left, box.Top + 8, box.Width, 1)
                     ),
                 "Host",

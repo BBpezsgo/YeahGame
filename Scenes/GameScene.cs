@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Win32.Common;
 using YeahGame.Messages;
 
 namespace YeahGame;
@@ -61,6 +62,11 @@ public class GameScene : Scene
                 Position = GetSpawnPoint(),
             });
 
+            // AddEntity(new FlashEffect()
+            // {
+            //     Position = new Vector2(30, 20),
+            // });
+
             // for (int i = 0; i < 5; i++)
             // {
             //     AddEntity(new Tester()
@@ -113,28 +119,29 @@ public class GameScene : Scene
                 }
             }
 
-            SmallRect box = Layout.Center(new Coord(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Clear(box);
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            box = box.Margin(2);
 
-            int i = 2;
+            int y = 0;
 
             if (!selfContained)
-            { Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalEndPoint}){(Game.Connection.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
+            { Game.Renderer.Text(box.Left, box.Top + y++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalEndPoint}){(Game.Connection.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
 
             foreach (KeyValuePair<string, (PlayerInfo Info, bool IsServer)> item in infos)
             {
                 if (item.Key == Game.Connection.LocalEndPoint?.ToString())
-                { Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
+                { Game.Renderer.Text(box.Left, box.Top + y++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
                 else
-                { Game.Renderer.Text(box.Left + 2, box.Top + i++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.White); }
+                { Game.Renderer.Text(box.Left, box.Top + y++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.White); }
             }
         }
 
         if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
         {
-            SmallRect box = Layout.Center(new Coord(50, 7), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Fill(box, CharColor.Black, CharColor.Black, ' ');
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
@@ -152,10 +159,18 @@ public class GameScene : Scene
         if (Game.Connection.IsConnected && Time.Now - LastPlayerInfoSync >= PlayerInfoSyncInterval)
         {
             LastPlayerInfoSync = Time.Now;
-            Game.Connection.Send(InfoRequestMessage.SharedFromClient);
+            Game.Connection.Send(new InfoRequestMessage()
+            {
+                From = null,
+                FromServer = false,
+            });
             if (!Game.IsServer)
             {
-                Game.Connection.Send(InfoRequestMessage.SharedFromServer);
+                Game.Connection.Send(new InfoRequestMessage()
+                {
+                    From = null,
+                    FromServer = true,
+                });
             }
         }
 
@@ -347,7 +362,11 @@ public class GameScene : Scene
         if (phase != Connection.ConnectingPhase.Handshake) return;
         if (!Game.Connection.IsServer) return;
 
-        Game.Connection.SendTo(InfoRequestMessage.SharedFromClient, client);
+        Game.Connection.SendTo(new InfoRequestMessage()
+        {
+            From = null,
+            FromServer = false,
+        }, client);
 
         foreach (NetworkEntity? entity in _networkEntities)
         {

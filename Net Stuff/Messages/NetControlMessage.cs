@@ -15,10 +15,6 @@ public enum NetControlMessageKind : byte
 
 public class NetControlMessage : Message
 {
-    public static readonly NetControlMessage SharedImHere = new(NetControlMessageKind.IM_THERE);
-    public static readonly NetControlMessage SharedPing = new(NetControlMessageKind.PING);
-    public static readonly NetControlMessage SharedPong = new(NetControlMessageKind.PONG);
-
     public required NetControlMessageKind Kind { get; set; }
 
     [SetsRequiredMembers]

@@ -336,7 +336,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             case NetControlMessageKind.PING:
             {
                 Debug.WriteLine($"[Net]: =={source}=> PONG");
-                SendImmediateTo(NetControlMessage.SharedPong, source);
+                SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
                 return;
             }
             case NetControlMessageKind.PONG:
@@ -412,7 +412,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 Time.NowNoCache - client.Value.SentAt > PingInterval)
             {
                 Debug.WriteLine($"[Net]: =={client.Value.EndPoint}=> PING");
-                SendImmediateTo(NetControlMessage.SharedPing, client.Value.EndPoint);
+                SendImmediateTo(new NetControlMessage(NetControlMessageKind.PING), client.Value.EndPoint);
             }
 
             if (Time.NowNoCache - client.Value.ReceivedAt > Timeout)
@@ -435,7 +435,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 Time.NowNoCache - _sentAt > PingInterval)
             {
                 Debug.WriteLine($"[Net]: =={RemoteEndPoint}=> PING");
-                SendImmediate(NetControlMessage.SharedPing);
+                SendImmediate(new NetControlMessage(NetControlMessageKind.PING));
             }
 
             if (Time.NowNoCache - _receivedAt > Timeout && _shouldListen)

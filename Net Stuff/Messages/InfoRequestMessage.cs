@@ -5,9 +5,6 @@ namespace YeahGame.Messages;
 
 public class InfoRequestMessage : Message
 {
-    public static readonly InfoRequestMessage SharedFromServer = new() { From = null, FromServer = true };
-    public static readonly InfoRequestMessage SharedFromClient = new() { From = null, FromServer = false };
-
     public required bool FromServer { get; set; }
     public required IPEndPoint? From { get; set; }
 

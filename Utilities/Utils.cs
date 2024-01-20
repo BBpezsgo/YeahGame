@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Win32.Common;
 
 namespace YeahGame;
 
@@ -41,19 +42,19 @@ public static partial class Utils
 
         if (value > 512)
         {
-            value = value / 1024f;
+            value /= 1024f;
             postfix = "kb";
         }
 
         if (value > 512)
         {
-            value = value / 1024f;
+            value /= 1024f;
             postfix = "mb";
         }
 
         if (value > 512)
         {
-            value = value / 1024f;
+            value /= 1024f;
             postfix = "gb";
         }
 
