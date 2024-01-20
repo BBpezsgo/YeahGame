@@ -44,9 +44,10 @@ public class Game
 
     float _lastConnectionCounterReset;
     Graph _sentBytes;
-    Graph _receivedBytes;
+    ColoredGraph _receivedBytes;
     int _sentBytesPerSec;
     int _receivedBytesPerSec;
+    int _lastLostPackets;
 
     float _lastFpsCounterReset;
     MinMax<int> _currentFps;
@@ -69,7 +70,7 @@ public class Game
         renderer = new ConsoleRenderer();
 
         _sentBytes = new Graph(GraphWidth + 1);
-        _receivedBytes = new Graph(GraphWidth + 1);
+        _receivedBytes = new ColoredGraph(GraphWidth + 1);
         _fps = new MinMaxGraph(GraphWidth + 1);
         _memory = new Graph(GraphWidth + 1);
 
@@ -201,9 +202,16 @@ public class Game
                 _lastConnectionCounterReset = Time.Now;
                 _sentBytesPerSec = _connection.SentBytes;
                 _receivedBytesPerSec = _connection.ReceivedBytes;
+                int loss = _connection.LostPackets - _lastLostPackets;
+                _lastLostPackets = _connection.LostPackets;
 
                 _sentBytes.Append(_sentBytesPerSec);
-                _receivedBytes.Append(_receivedBytesPerSec);
+                _receivedBytes.Append(_receivedBytesPerSec, loss switch
+                {
+                    > 1 => CharColor.BrightRed,
+                    > 0 => CharColor.Yellow,
+                    _ => CharColor.White,
+                });
 
                 _connection.ResetCounter();
             }
@@ -257,6 +265,7 @@ public class Game
                 }
 
                 renderer.Text(rect.X + 1, y++, $"State: {_connection.State}");
+                renderer.Text(rect.X + 1, y++, $"Lost Packets: {_connection.LostPackets}");
 
                 renderer.Dropdown(rect.X + 1, y, _sentBytesDropdown, $"Sent: {_sentBytesPerSec} bytes/sec", Utils.DropdownStyle);
                 y++;

@@ -13,6 +13,7 @@ public enum MessageType : byte
 public abstract class Message : ISerializable
 {
     MessageType _type;
+    public uint Index;
 
     public MessageType Type => _type;
 
@@ -22,11 +23,13 @@ public abstract class Message : ISerializable
     public virtual void Serialize(BinaryWriter writer)
     {
         writer.Write((byte)_type);
+        writer.Write(Index);
     }
 
     public virtual void Deserialize(BinaryReader reader)
     {
         _type = (MessageType)reader.ReadByte();
+        Index = reader.ReadUInt32();
     }
 
     public override string ToString() => $"{{ {_type} }}";

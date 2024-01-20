@@ -51,6 +51,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         public readonly ConcurrentQueue<Message> OutgoingQueue;
         public readonly IPEndPoint EndPoint;
 
+        public bool ShookHands;
+
         public double ReceivedAt;
         public double SentAt;
 
@@ -76,6 +78,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     const double Timeout = 10d;
     const double PingInterval = 5d;
     const float DiscoveryInterval = 5f;
+    const float DropProbability = .6f;
 
     #endregion
 
@@ -92,6 +95,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     #region Public Properties
 
     public T? LocalUserInfo;
+
+    public int LostPackets => _lostPackets;
 
     public IReadOnlyList<IPEndPoint> DiscoveredServers => _discoveredServers;
     public ICollection<string> Connections => _connections.Keys;
@@ -162,6 +167,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     #region Fields
 
+    readonly Dictionary<string, uint> _receivingIndex = new();
+    uint _sendingIndex;
+    int _lostPackets;
+
     readonly ConcurrentQueue<UdpMessage> _incomingQueue = new();
     readonly Queue<Message> _outgoingQueue = new();
 
@@ -197,6 +206,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _justListen = false;
         _isServer = false;
         _shookHandsWithServer = false;
+        _lostPackets = 0;
 
         _shouldListen = true;
         _listeningThread = new Thread(Listen) { Name = "UDP Listener" };
@@ -216,6 +226,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _justListen = true;
         _isServer = false;
         _shookHandsWithServer = false;
+        _lostPackets = 0;
 
         _shouldListen = true;
         _listeningThread = new Thread(Listen) { Name = "UDP Listener" };
@@ -232,6 +243,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _justListen = false;
         _isServer = true;
         _shookHandsWithServer = false;
+        _lostPackets = 0;
 
         _shouldListen = true;
         _listeningThread = new Thread(Listen) { Name = "UDP Listener" };
@@ -308,6 +320,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _client?.Dispose();
         _client = null;
         _shookHandsWithServer = false;
+        _lostPackets = 0;
 
         if (!_isServer)
         { OnDisconnectedFromServer?.Invoke(); }
@@ -320,7 +333,12 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
             {
                 SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
-                OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Handshake);
+                if (_connections.TryGetValue(source.ToString(), out UdpClient<T>? client) &&
+                    !client.ShookHands)
+                {
+                    client.ShookHands = true;
+                    OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Handshake);
+                }
                 return;
             }
             case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
@@ -453,6 +471,19 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         using MemoryStream stream = new(buffer);
         using BinaryReader reader = new(stream);
 
+        void HandleIndexing(Message message)
+        {
+            if (!_receivingIndex.ContainsKey(source.ToString()))
+            { _receivingIndex.Add(source.ToString(), 0); }
+            _receivingIndex[source.ToString()]++;
+            if (_receivingIndex[source.ToString()] != message.Index)
+            {
+                Debug.WriteLine($"PACKET LOSS");
+                _lostPackets++;
+                _receivingIndex[source.ToString()] = message.Index;
+            }
+        }
+
         while (reader.BaseStream.Position < reader.BaseStream.Length)
         {
             MessageType messageType = (MessageType)buffer[reader.BaseStream.Position];
@@ -463,6 +494,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.Control:
                 {
                     NetControlMessage _message = new(reader);
+                    HandleIndexing(_message);
                     FeedControlMessage(source, _message);
                     return;
                 }
@@ -482,6 +514,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.InfoResponse:
                 {
                     InfoResponseMessage _message = new(reader);
+                    HandleIndexing(_message);
 
                     Debug.WriteLine($"[Net]: <= {source} == {_message}");
 
@@ -508,6 +541,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.InfoRequest:
                 {
                     InfoRequestMessage _message = new(reader);
+                    HandleIndexing(_message);
 
                     Debug.WriteLine($"[Net]: <= {source} == {_message}");
 
@@ -583,6 +617,12 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
             // Debug.WriteLine($"[Net]: <= {source} == {message}");
 
+            HandleIndexing(message);
+            if (!_isServer && !_shookHandsWithServer)
+            {
+                SendImmediate(new NetControlMessage(NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY));
+            }
+
             OnMessageReceived?.Invoke(message, source);
         }
     }
@@ -596,6 +636,11 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         if (_client is null) return;
 
         _sentAt = Time.NowNoCache;
+
+        message.Index = _sendingIndex++;
+
+        if (DropProbability != 0f && Random.Shared.NextDouble() < DropProbability)
+        { return; }
 
         byte[] data = Utils.Serialize(message);
         if (IsServer)
@@ -620,6 +665,11 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         if (_client is null) return;
 
         _sentAt = Time.NowNoCache;
+
+        message.Index = _sendingIndex++;
+
+        if (DropProbability != 0f && Random.Shared.NextDouble() < DropProbability)
+        { return; }
 
         byte[] data = Utils.Serialize(message);
         if (IsServer)
