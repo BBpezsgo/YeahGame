@@ -48,7 +48,8 @@ public class Player : NetworkEntity
         Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
         Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
 
-        if (Mouse.IsPressed(MouseButton.Left) &&
+        if (!Mouse.WasUsed &&
+            Mouse.IsPressed(MouseButton.Left) &&
             Time.Now - LastShot >= ReloadTime)
         {
             Vector2 velocity = Mouse.RecordedConsolePosition - Position;
@@ -111,7 +112,7 @@ public class Player : NetworkEntity
 
         if (Owner is not null &&
             Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance &&
-            Game.Connection.PlayerInfos.TryGetValue(Owner, out (PlayerInfo Info, bool IsServer) info))
+            Game.Connection.TryGetPlayerInfo(Owner, out (PlayerInfo Info, bool IsServer) info))
         {
             Game.Renderer.Text(Position.Round() + new Vector2Int(0, 1), info.Info.Username);
         }

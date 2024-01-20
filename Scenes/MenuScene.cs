@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using YeahGame.Messages;
 
 namespace YeahGame;
 
@@ -9,23 +8,11 @@ public class MenuScene : Scene
 {
     public override string Name => "Menu";
 
-    static readonly ConsoleRenderer.ButtonStyle ButtonStyle = new()
-    {
-        Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
-        Hover = CharColor.Make(CharColor.Black, CharColor.White),
-        Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
-    };
-
-    static readonly ConsoleRenderer.TextFieldStyle TextFieldStyle = new()
-    {
-        Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
-        Active = CharColor.Make(CharColor.Black, CharColor.White),
-    };
-
-    ConsoleRenderer.TextField InputSocket = new("127.0.0.1:5555");
+    ConsoleInputField InputSocket = new("127.0.0.1:5555");
     string? InputSocketError = null;
+    ConsoleInputField InputName = new("Bruh");
 
-    ConsoleRenderer.TextField InputName = new("Bruh");
+    public string? ExitReason;
 
     public override void Load()
     {
@@ -35,78 +22,114 @@ public class MenuScene : Scene
     public override void Unload()
     {
         base.Unload();
+        ExitReason = null;
     }
 
     public override void Render()
     {
-        SmallRect box = Layout.Center(new Coord(30, 11), new SmallRect(default, Game.Renderer.Rect));
-
-        Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
-
-        Game.Renderer.Text(box.Left + 2, box.Top + 2, "Socket:");
-
-        Game.Renderer.InputField(
-            new SmallRect((short)(box.Left + 2), (short)(box.Top + 3), (short)(box.Width - 4), 1),
-            TextFieldStyle,
-            ref InputSocket);
-
-        Game.Renderer.Text(box.Left + 2, box.Top + 4, InputSocketError, CharColor.BrightRed);
-
-        Game.Renderer.Text(box.Left + 2, box.Top + 5, "Username:");
-
-        Game.Renderer.InputField(
-            new SmallRect((short)(box.Left + 2), (short)(box.Top + 6), (short)(box.Width - 4), 1),
-            TextFieldStyle,
-            ref InputName);
-
-        if (Game.Renderer.Button(
-            Layout.Center(
-                new Coord(10, 1),
-                new SmallRect(box.Left, (short)(box.Top + 7), box.Width, 1)
-                ),
-            "Connect",
-            ButtonStyle))
+        if (ExitReason is not null)
         {
-            InputSocketError = null;
-            Game.Connection.LocalUserInfo = new PlayerInfo()
-            {
-                Username = InputName.Value.ToString(),
-            };
+            SmallRect box = Layout.Center(new Coord(30, 6), new SmallRect(default, Game.Renderer.Rect));
 
-            if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            box = box.Margin(1);
+
+            int center = Layout.Center(box.Width, ExitReason);
+            Game.Renderer.Text(box.Left + center, box.Top + 1, ExitReason);
+
+            if (Game.Renderer.Button(new SmallRect(box.X, box.Top + 3, box.Width, 1), "OK", Utils.ButtonStyle))
             {
-                try
-                { Game.Connection.Client(address, port); }
-                catch (Exception)
-                { InputSocketError = "Bruh"; }
+                ExitReason = null;
             }
-            else
-            { InputSocketError = error; }
         }
-
-        if (Game.Renderer.Button(
-            Layout.Center(
-                new Coord(10, 1),
-                new SmallRect(box.Left, (short)(box.Top + 8), box.Width, 1)
-                ),
-            "Host",
-            ButtonStyle))
+        else if (Game.Connection.State != ConnectionState.None)
         {
-            InputSocketError = null;
-            Game.Connection.LocalUserInfo = new PlayerInfo()
-            {
-                Username = InputName.Value.ToString(),
-            };
+            SmallRect box = Layout.Center(new Coord(30, 4), new SmallRect(default, Game.Renderer.Rect));
 
-            if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            box = box.Margin(1);
+
+            string text = Game.Connection.State switch
             {
-                try
-                { Game.Connection.Server(address, port); }
-                catch (Exception)
-                { InputSocketError = "Bruh"; }
+                ConnectionState.Hosting => "Hosting",
+                ConnectionState.Connecting => "Connecting ...",
+                ConnectionState.Connected => "Connected",
+                _ => "Bruh",
+            };
+            int center = Layout.Center(box.Width, text);
+            Game.Renderer.Text(box.Left + center, box.Top + 1, text);
+        }
+        else
+        {
+            SmallRect box = Layout.Center(new Coord(30, 11), new SmallRect(default, Game.Renderer.Rect));
+
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+
+            Game.Renderer.Text(box.Left + 2, box.Top + 2, "Socket:");
+
+            Game.Renderer.InputField(
+                new SmallRect(box.Left + 2, box.Top + 3, box.Width - 4, 1),
+                Utils.TextFieldStyle,
+                ref InputSocket);
+
+            Game.Renderer.Text(box.Left + 2, box.Top + 4, InputSocketError, CharColor.BrightRed);
+
+            Game.Renderer.Text(box.Left + 2, box.Top + 5, "Username:");
+
+            Game.Renderer.InputField(
+                new SmallRect(box.Left + 2, box.Top + 6, box.Width - 4, 1),
+                Utils.TextFieldStyle,
+                ref InputName);
+
+            if (Game.Renderer.Button(
+                Layout.Center(
+                    new Coord(10, 1),
+                    new SmallRect(box.Left, box.Top + 7, box.Width, 1)
+                    ),
+                "Connect",
+                Utils.ButtonStyle))
+            {
+                InputSocketError = null;
+                Game.Connection.LocalUserInfo = new PlayerInfo()
+                {
+                    Username = InputName.Value.ToString(),
+                };
+
+                if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+                {
+                    try
+                    { Game.Connection.StartClient(address, port); }
+                    catch (Exception)
+                    { InputSocketError = "Bruh"; }
+                }
+                else
+                { InputSocketError = error; }
             }
-            else
-            { InputSocketError = error; }
+
+            if (Game.Renderer.Button(
+                Layout.Center(
+                    new Coord(10, 1),
+                    new SmallRect(box.Left, box.Top + 8, box.Width, 1)
+                    ),
+                "Host",
+                Utils.ButtonStyle))
+            {
+                InputSocketError = null;
+                Game.Connection.LocalUserInfo = new PlayerInfo()
+                {
+                    Username = InputName.Value.ToString(),
+                };
+
+                if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+                {
+                    try
+                    { Game.Connection.StartHost(address, port); }
+                    catch (Exception)
+                    { InputSocketError = "Bruh"; }
+                }
+                else
+                { InputSocketError = error; }
+            }
         }
     }
 
@@ -115,7 +138,7 @@ public class MenuScene : Scene
 
     }
 
-    static bool TryParseSocket(
+    public static bool TryParseSocket(
         string input,
         [NotNullWhen(true)] out IPAddress? address,
         [NotNullWhen(true)] out ushort port,

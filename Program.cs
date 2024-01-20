@@ -37,6 +37,6 @@ public class Program
         // }
 
         Game game = new();
-        game.Start();
+        game.Start(args);
     }
 }

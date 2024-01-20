@@ -437,6 +437,27 @@ public static class Ascii
         ' ',  // 0b_1111 invalid
     };
 
+    public static readonly char[] PanelSides = new char[]
+    {
+        //          TLBR
+        ' ',  // 0b_0000
+        '│',  // 0b_0001
+        '─',  // 0b_0010
+        '┘',  // 0b_0011
+        '│',  // 0b_0100
+        '│',  // 0b_0101 invalid
+        '└',  // 0b_0110
+        '│',  // 0b_0111 invalid
+        '═',  // 0b_1000
+        '╕',  // 0b_1001
+        '─',  // 0b_1010 invalid
+        '─',  // 0b_1011 invalid
+        '╒',  // 0b_1100
+        '│',  // 0b_1101 invalid
+        '─',  // 0b_1110 invalid
+        ' ',  // 0b_1111 invalid
+    };
+
     public static readonly char[] BoxSidesDouble = new char[]
     {
         //          TLBR

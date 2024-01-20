@@ -115,6 +115,7 @@ public class GameScene : Scene
 
             SmallRect box = Layout.Center(new Coord(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Rect));
 
+            Game.Renderer.Clear(box);
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
 
             int i = 2;
@@ -131,7 +132,7 @@ public class GameScene : Scene
             }
         }
 
-        if (!TryGetLocalPlayer(out _))
+        if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
         {
             SmallRect box = Layout.Center(new Coord(50, 7), new SmallRect(default, Game.Renderer.Rect));
 
@@ -151,18 +152,10 @@ public class GameScene : Scene
         if (Game.Connection.IsConnected && Time.Now - LastPlayerInfoSync >= PlayerInfoSyncInterval)
         {
             LastPlayerInfoSync = Time.Now;
-            Game.Connection.Send(new InfoRequestMessage()
-            {
-                From = null,
-                FromServer = false,
-            });
+            Game.Connection.Send(InfoRequestMessage.SharedFromClient);
             if (!Game.IsServer)
             {
-                Game.Connection.Send(new InfoRequestMessage()
-                {
-                    From = null,
-                    FromServer = true,
-                });
+                Game.Connection.Send(InfoRequestMessage.SharedFromServer);
             }
         }
 
@@ -334,6 +327,11 @@ public class GameScene : Scene
 
     #region Networking
 
+    public void OnDisconnectedFromServer()
+    {
+        Game.Singleton.MenuScene.ExitReason = "Disconnected form server";
+    }
+
     public void OnClientDisconnected(IPEndPoint client)
     {
         for (int i = Players.Count - 1; i >= 0; i--)
@@ -349,11 +347,7 @@ public class GameScene : Scene
         if (phase != Connection.ConnectingPhase.Handshake) return;
         if (!Game.Connection.IsServer) return;
 
-        Game.Connection.SendTo(new InfoRequestMessage()
-        {
-            From = null,
-            FromServer = false,
-        }, client);
+        Game.Connection.SendTo(InfoRequestMessage.SharedFromClient, client);
 
         foreach (NetworkEntity? entity in _networkEntities)
         {

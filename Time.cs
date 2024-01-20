@@ -23,6 +23,11 @@ public static class Time
     /// </summary>
     public static double NowNoCache => DateTime.UtcNow.TimeOfDay.TotalSeconds;
 
+    /// <summary>
+    /// Frames per second
+    /// </summary>
+    public static float FPS => 1f / (float)deltaTime;
+
     public static void Tick()
     {
         now = DateTime.UtcNow.TimeOfDay.TotalSeconds;

@@ -5,6 +5,61 @@ namespace YeahGame;
 
 public static partial class Utils
 {
+    public const bool IsDebug =
+#if DEBUG
+        true;
+#else
+        false;
+#endif
+
+    public static readonly ConsoleButtonStyle ButtonStyle = new()
+    {
+        Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
+        Hover = CharColor.Make(CharColor.Black, CharColor.White),
+        Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
+    };
+
+    public static readonly ConsoleInputFieldStyle TextFieldStyle = new()
+    {
+        Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
+        Active = CharColor.Make(CharColor.Black, CharColor.White),
+    };
+
+    public static readonly ConsoleDropdownStyle DropdownStyle = new()
+    {
+        Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
+        Hover = CharColor.Make(CharColor.Black, CharColor.White),
+        Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
+        ActiveChar = '▼',
+        InactiveChar = '►',
+    };
+
+    public static string FormatMemorySize(int byteCount)
+    {
+        string postfix = "bytes";
+        float value = byteCount;
+
+        if (value > 512)
+        {
+            value = value / 1024f;
+            postfix = "kb";
+        }
+
+        if (value > 512)
+        {
+            value = value / 1024f;
+            postfix = "mb";
+        }
+
+        if (value > 512)
+        {
+            value = value / 1024f;
+            postfix = "gb";
+        }
+
+        return $"{value:0.#} {postfix}";
+    }
+
     public static byte[] Serialize<T>(T data)
         where T : ISerializable
         => Serialize(data.Serialize);
