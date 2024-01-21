@@ -112,7 +112,7 @@ public class Player : NetworkEntity
 
         if (Owner is not null &&
             Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance &&
-            Game.Connection.TryGetPlayerInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) &&
+            Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) &&
             info.Info != null)
         {
             Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username);

@@ -61,7 +61,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     class ConnectionClient
     {
         public readonly ConcurrentQueue<byte[]> IncomingQueue;
-        public readonly ConcurrentQueue<Message> OutgoingQueue;
+        public readonly List<Message> OutgoingQueue;
         public readonly IPEndPoint EndPoint;
 
         public bool ShookHands;
@@ -69,14 +69,18 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         public double ReceivedAt;
         public double SentAt;
 
+        public uint ReceivingIndex;
+        public uint SendingIndex;
+
         public ConnectionClient(IPEndPoint endPoint)
         {
             IncomingQueue = new ConcurrentQueue<byte[]>();
-            OutgoingQueue = new ConcurrentQueue<Message>();
+            OutgoingQueue = new List<Message>();
             EndPoint = endPoint;
 
             ReceivedAt = Time.NowNoCache;
             SentAt = Time.NowNoCache;
+            ReceivingIndex = 0;
         }
     }
 
@@ -85,9 +89,9 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         const float MaxAge = 5f;
         const float MinRequestInterval = 1f;
 
-        public TUserInfo? Info;
-        public bool IsServer;
-        public float ReceivedAt;
+        public readonly TUserInfo? Info;
+        public readonly bool IsServer;
+        public readonly float ReceivedAt;
         public float RequestedAt;
 
         public bool ShouldRequest => ((float)Time.NowNoCache - ReceivedAt > MaxAge) && ((float)Time.Now - RequestedAt > MinRequestInterval);
@@ -107,6 +111,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     #region Constants
 
+    const int MaxPayloadSize = 64;
     const double Timeout = 10d;
     const double PingInterval = 5d;
     const float DiscoveryInterval = 5f;
@@ -131,8 +136,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     public int LostPackets => _lostPackets;
 
     public IReadOnlyList<IPEndPoint> DiscoveredServers => _discoveredServers;
-    public IReadOnlySet<string> Connections => _connections.Keys.Select(v => v.ToString()).ToFrozenSet();
-    public IReadOnlyDictionary<string, ConnectionUserInfo<TUserInfo>> UserInfos => _userInfos.Select(v => new KeyValuePair<string, ConnectionUserInfo<TUserInfo>>(v.Key.ToString(), (ConnectionUserInfo<TUserInfo>)v.Value)).ToFrozenDictionary();
+    public ICollection<IPEndPoint> Connections => _connections.Keys;
+    public IReadOnlyDictionary<IPEndPoint, ConnectionUserInfo<TUserInfo>> UserInfos => _userInfos.Select(v => new KeyValuePair<IPEndPoint, ConnectionUserInfo<TUserInfo>>(v.Key, (ConnectionUserInfo<TUserInfo>)v.Value)).ToFrozenDictionary();
 
     public IPEndPoint? RemoteEndPoint
     {
@@ -226,12 +231,11 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     #region Fields
 
-    readonly Dictionary<IPEndPoint, uint> _receivingIndex = new();
     uint _sendingIndex;
     int _lostPackets;
 
     readonly ConcurrentQueue<UdpMessage> _incomingQueue = new();
-    readonly Queue<Message> _outgoingQueue = new();
+    readonly List<Message> _outgoingQueue = new();
 
     readonly List<IPEndPoint> _discoveredServers = new();
     float _lastDiscoveryBroadcast;
@@ -260,7 +264,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     public void StartClient(IPEndPoint endPoint)
     {
-        _client = new UdpClient();
+        _client = new UdpClient
+        {
+            DontFragment = true,
+        };
         _client.AllowNatTraversal(true);
 
         Debug.WriteLine($"[Net]: Connecting to {endPoint} ...");
@@ -285,7 +292,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     public void JustListen()
     {
-        _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+        _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0))
+        {
+            DontFragment = true,
+        };
         _client.AllowNatTraversal(true);
 
         _justListen = true;
@@ -303,7 +313,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     public void StartHost(IPEndPoint endPoint)
     {
-        _client = new UdpClient(endPoint);
+        _client = new UdpClient(endPoint)
+        {
+            DontFragment = true,
+        };
         _client.AllowNatTraversal(true);
 
         _justListen = false;
@@ -397,7 +410,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         { OnDisconnectedFromServer?.Invoke(); }
     }
 
-    void FeedControlMessage(IPEndPoint source, NetControlMessage netControlMessage)
+    void FeedControlMessage(NetControlMessage netControlMessage, IPEndPoint source)
     {
         switch (netControlMessage.Kind)
         {
@@ -462,27 +475,25 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
         while (_incomingQueue.TryDequeue(out UdpMessage messageIn))
         {
-            OnReceiveInternal(messageIn.Source, messageIn.Buffer);
+            OnReceiveInternal(messageIn.Buffer, messageIn.Source);
 
             if (endlessLoop-- < 0)
             { break; }
         }
 
-        while (_outgoingQueue.TryDequeue(out Message? messageOut))
-        { SendImmediate(messageOut); }
+        SendImmediate(_outgoingQueue);
+        _outgoingQueue.Clear();
 
         shouldRemove.Clear();
 
         foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
         {
-            while (client.Value.OutgoingQueue.TryDequeue(out Message? messageOut))
-            {
-                SendImmediateTo(messageOut, client.Value.EndPoint);
-            }
+            SendImmediateTo(client.Value.OutgoingQueue, client.Value.EndPoint);
+            client.Value.OutgoingQueue.Clear();
 
             while (client.Value.IncomingQueue.TryDequeue(out byte[]? messageIn))
             {
-                OnReceiveInternal(client.Value.EndPoint, messageIn);
+                OnReceiveInternal(messageIn, client.Value.EndPoint);
             }
 
             if (Time.NowNoCache - client.Value.ReceivedAt > PingInterval &&
@@ -538,32 +549,12 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         }
     }
 
-    void OnReceiveInternal(IPEndPoint source, byte[] buffer)
+    void OnReceiveInternal(byte[] buffer, IPEndPoint source)
     {
         if (buffer.Length == 0) return;
 
         using MemoryStream stream = new(buffer);
         using BinaryReader reader = new(stream);
-
-        void HandleIndexing(Message message)
-        {
-            if (!_receivingIndex.TryGetValue(source, out uint value))
-            {
-                value = 0;
-                _receivingIndex.Add(source, value);
-            }
-            else
-            {
-                _receivingIndex[source] = ++value;
-            }
-
-            if (value != message.Index)
-            {
-                Debug.WriteLine($"[Net]: Lost packet (expected {value} got {message.Index})");
-                _lostPackets++;
-                _receivingIndex[source] = message.Index;
-            }
-        }
 
         while (reader.BaseStream.Position < reader.BaseStream.Length)
         {
@@ -575,9 +566,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.Control:
                 {
                     NetControlMessage _message = new(reader);
-                    HandleIndexing(_message);
-                    _receivedPackets++;
-                    FeedControlMessage(source, _message);
+                    OnReceivingInternal(_message, source);
+                    FeedControlMessage(_message, source);
                     return;
                 }
 
@@ -596,8 +586,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.InfoResponse:
                 {
                     InfoResponseMessage _message = new(reader);
-                    HandleIndexing(_message);
-                    _receivedPackets++;
+                    OnReceivingInternal(_message, source);
 
                     Debug.WriteLine($"[Net]: <= {source} == {_message}");
 
@@ -624,8 +613,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.InfoRequest:
                 {
                     InfoRequestMessage _message = new(reader);
-                    HandleIndexing(_message);
-                    _receivedPackets++;
+                    OnReceivingInternal(_message, source);
 
                     Debug.WriteLine($"[Net]: <= {source} == {_message}");
 
@@ -705,6 +693,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.HandshakeRequest:
                 {
                     HandshakeRequestMessage _message = new(reader);
+                    OnReceivingInternal(_message, source);
 
                     Debug.WriteLine($"[Net]: <= {source} == Handshake Request");
 
@@ -726,6 +715,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                 case MessageType.HandshakeResponse:
                 {
                     HandshakeResponseMessage _message = new(reader);
+                    OnReceivingInternal(_message, source);
 
                     Debug.WriteLine($"[Net]: <= {source} == Handshake Response (This is me: {_message.ThisIsYou})");
 
@@ -742,8 +732,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
             // Debug.WriteLine($"[Net]: <= {source} == {message}");
 
-            HandleIndexing(message);
-            _receivedPackets++;
+            OnReceivingInternal(message, source);
 
             if (!_isServer && _thisIsMe is null)
             { SendImmediate(new HandshakeRequestMessage()); }
@@ -752,9 +741,73 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         }
     }
 
+    void OnReceivingInternal(Message message, IPEndPoint source)
+    {
+        _receivedPackets++;
+
+        if (!_connections.TryGetValue(source, out ConnectionClient? client))
+        { return; }
+
+        client.ReceivingIndex++;
+
+        if (client.ReceivingIndex != message.Index)
+        {
+            Debug.WriteLine($"[Net]: Lost packet (expected {client.ReceivingIndex} got {message.Index})");
+            _lostPackets++;
+            client.ReceivingIndex = message.Index;
+        }
+    }
+
     #endregion
 
     #region Message Sending
+
+    readonly List<byte> _jointData = new(MaxPayloadSize);
+    readonly List<Message> _jointMessages = new();
+
+    public void SendImmediate(IEnumerable<Message> messages)
+    {
+        if (_client is null) return;
+
+        if (IsServer)
+        {
+            foreach (IPEndPoint client in _connections.Keys)
+            { SendImmediateTo(messages, client); }
+        }
+        else
+        {
+            _jointData.Clear();
+            _jointMessages.Clear();
+
+            foreach (Message message in messages)
+            {
+                message.Index = _sendingIndex++;
+                byte[] data = Utils.Serialize(message);
+
+                if (_jointData.Count + data.Length > MaxPayloadSize)
+                {
+                    SendImmediate(_jointData.ToArray(), _jointMessages);
+                    _jointData.Clear();
+                }
+
+                if (data.Length >= MaxPayloadSize)
+                {
+                    SendImmediate(data, [message]);
+                }
+                else
+                {
+                    _jointData.AddRange(data);
+                    _jointMessages.Add(message);
+                }
+            }
+
+            if (_jointData.Count > 0)
+            { SendImmediate(_jointData.ToArray(), _jointMessages); }
+
+            _jointData.Clear();
+            _jointMessages.Clear();
+        }
+    }
 
     public void SendImmediate(Message message)
     {
@@ -762,113 +815,180 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
         _sentAt = Time.NowNoCache;
 
-        message.Index = _sendingIndex++;
-
         if (MessageDropProbability != 0f && Random.Shared.NextDouble() < MessageDropProbability)
         { return; }
 
-        byte[] data = Utils.Serialize(message);
         if (IsServer)
         {
             Debug.WriteLine($"[Net]: == ALL => {message}");
             foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
             {
-                _client.Send(data, data.Length, client.Value.EndPoint);
+                message.Index = client.Value.SendingIndex++;
+                byte[] data = Utils.Serialize(message);
+                _client.Send(data, data.Length, client.Key);
                 _sentBytes += data.Length;
             }
         }
         else
         {
+            message.Index = _sendingIndex++;
+            byte[] data = Utils.Serialize(message);
             Debug.WriteLine($"[Net]: == SERVER => {message}");
             _client.Send(data, data.Length);
             _sentBytes += data.Length;
         }
     }
 
-    public void SendImmediateTo(Message message, IPEndPoint destination)
+    void SendImmediate(byte[] data, IEnumerable<Message> message)
     {
         if (_client is null) return;
 
         _sentAt = Time.NowNoCache;
 
-        message.Index = _sendingIndex++;
-
         if (MessageDropProbability != 0f && Random.Shared.NextDouble() < MessageDropProbability)
         { return; }
 
-        byte[] data = Utils.Serialize(message);
         if (IsServer)
         {
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+            Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
+            foreach (IPEndPoint client in _connections.Keys)
             {
-                if (!client.Value.EndPoint.Equals(destination)) continue;
-
-                Debug.WriteLine($"[Net]: == {destination} => {message}");
-                _client.Send(data, data.Length, client.Value.EndPoint);
+                _client.Send(data, data.Length, client);
                 _sentBytes += data.Length;
-                client.Value.SentAt = Time.NowNoCache;
             }
         }
         else
         {
-            if (RemoteEndPoint?.ToString() == destination.ToString())
+            Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
+            _client.Send(data, data.Length);
+            _sentBytes += data.Length;
+        }
+    }
+
+    public void SendImmediateTo(IEnumerable<Message> messages, IPEndPoint destination)
+    {
+        if (_client is null) return;
+
+        _jointData.Clear();
+        _jointMessages.Clear();
+        _connections.TryGetValue(destination, out ConnectionClient? destinationClient);
+
+        foreach (Message message in messages)
+        {
+            if (IsServer)
             {
-                Debug.WriteLine($"[Net]: == SERVER => {message}");
+                if (destinationClient is not null)
+                { message.Index = destinationClient.SendingIndex++; }
+            }
+            else
+            { message.Index = _sendingIndex++; }
+
+            byte[] data = Utils.Serialize(message);
+
+            if (_jointData.Count + data.Length > MaxPayloadSize)
+            {
+                SendImmediateTo(_jointData.ToArray(), destination, _jointMessages);
+                _jointData.Clear();
+            }
+
+            if (data.Length >= MaxPayloadSize)
+            {
+                SendImmediateTo(data, destination, [message]);
+            }
+            else
+            {
+                _jointData.AddRange(data);
+                _jointMessages.Add(message);
+            }
+        }
+
+        if (_jointData.Count > 0)
+        { SendImmediateTo(_jointData.ToArray(), destination, _jointMessages); }
+
+        _jointData.Clear();
+        _jointMessages.Clear();
+    }
+
+    public void SendImmediateTo(Message message, IPEndPoint destination)
+    {
+        if (IsServer)
+        {
+            if (_connections.TryGetValue(destination, out ConnectionClient? destinationClient))
+            { message.Index = destinationClient.SendingIndex++; }
+        }
+        else
+        { message.Index = _sendingIndex++; }
+
+        byte[] data = Utils.Serialize(message);
+        SendImmediateTo(data, destination, [message]);
+    }
+
+    void SendImmediateTo(byte[] data, IPEndPoint destination, IEnumerable<Message> messages)
+    {
+        if (_client is null) return;
+
+        _sentAt = Time.NowNoCache;
+
+        if (MessageDropProbability != 0f && Random.Shared.NextDouble() < MessageDropProbability)
+        { return; }
+
+        if (IsServer)
+        {
+            if (_connections.TryGetValue(destination, out ConnectionClient? client))
+            {
+                Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
+                _client.Send(data, data.Length, client.EndPoint);
+                _sentBytes += data.Length;
+                client.SentAt = Time.NowNoCache;
+            }
+        }
+        else
+        {
+            if (destination.Equals(RemoteEndPoint))
+            {
+                Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
                 _client.Send(data, data.Length);
                 _sentBytes += data.Length;
             }
         }
     }
 
-    public void Send(Message message) => _outgoingQueue.Enqueue(message);
+    public void Send(Message message) => _outgoingQueue.Add(message);
 
     public void SendTo(Message message, IPEndPoint destination)
     {
-        _sentAt = Time.NowNoCache;
-
         if (IsServer)
         {
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
-            {
-                if (!client.Value.EndPoint.Equals(destination)) continue;
-
-                client.Value.OutgoingQueue.Enqueue(message);
-            }
+            if (_connections.TryGetValue(destination, out ConnectionClient? client))
+            { client.OutgoingQueue.Add(message); }
         }
         else
         {
-            if (RemoteEndPoint?.ToString() == destination.ToString())
-            {
-                Send(message);
-            }
+            if (destination.Equals(RemoteEndPoint))
+            { _outgoingQueue.Add(message); }
         }
     }
 
     public void SendExpect(Message message, IPEndPoint expect)
     {
-        _sentAt = Time.NowNoCache;
-
         if (IsServer)
         {
             foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
             {
                 if (client.Value.EndPoint.Equals(expect)) continue;
-
-                client.Value.OutgoingQueue.Enqueue(message);
+                client.Value.OutgoingQueue.Add(message);
             }
         }
         else
         {
-            if (RemoteEndPoint?.ToString() != expect.ToString())
-            {
-                Send(message);
-            }
+            if (!expect.Equals(RemoteEndPoint))
+            { _outgoingQueue.Add(message); }
         }
     }
 
-    public bool TryGetPlayerInfo(string owner, out ConnectionUserInfo<TUserInfo> info)
-        => TryGetPlayerInfo(IPEndPoint.Parse(owner), out info);
-    public bool TryGetPlayerInfo(IPEndPoint owner, out ConnectionUserInfo<TUserInfo> info)
+    public bool TryGetUserInfo(string owner, out ConnectionUserInfo<TUserInfo> info)
+        => TryGetUserInfo(IPEndPoint.Parse(owner), out info);
+    public bool TryGetUserInfo(IPEndPoint owner, out ConnectionUserInfo<TUserInfo> info)
     {
         if (_userInfos.TryGetValue(owner, out ConnectionUserInfoPrivate? _info))
         {

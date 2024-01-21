@@ -63,11 +63,6 @@ public class GameScene : Scene
                 Position = GetSpawnPoint(),
             });
 
-            // AddEntity(new FlashEffect()
-            // {
-            //     Position = new Vector2(30, 20),
-            // });
-
             // for (int i = 0; i < 5; i++)
             // {
             //     AddEntity(new Tester()
@@ -103,16 +98,24 @@ public class GameScene : Scene
             if (entity.DoesExist) entity.Render();
         }
 
+        // if (Mouse.IsDown(MouseButton.Left))
+        // {
+        //     AddEntity(new FlashEffect()
+        //     {
+        //         Position = Mouse.RecordedConsolePosition,
+        //     });
+        // }
+
         if (Keyboard.IsKeyHold('\t'))
         {
-            IReadOnlyDictionary<string, ConnectionUserInfo<PlayerInfo>> infos = Game.Connection.UserInfos;
+            IReadOnlyDictionary<IPEndPoint, ConnectionUserInfo<PlayerInfo>> infos = Game.Connection.UserInfos;
 
             bool selfContained = false;
             if (!Game.Connection.IsServer)
             {
-                foreach (KeyValuePair<string, ConnectionUserInfo<PlayerInfo>> item in infos)
+                foreach (KeyValuePair<IPEndPoint, ConnectionUserInfo<PlayerInfo>> item in infos)
                 {
-                    if (item.Key == Game.Connection.LocalEndPoint?.ToString())
+                    if (item.Key.Equals(Game.Connection.LocalEndPoint))
                     {
                         selfContained = true;
                         break;
@@ -131,12 +134,12 @@ public class GameScene : Scene
             if (!selfContained)
             { Game.Renderer.Text(box.Left, box.Top + y++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalEndPoint}){(Game.Connection.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
 
-            foreach (KeyValuePair<string, ConnectionUserInfo<PlayerInfo>> item in infos)
+            foreach (KeyValuePair<IPEndPoint, ConnectionUserInfo<PlayerInfo>> item in infos)
             {
                 StringBuilder builder = new();
                 byte color = CharColor.White;
 
-                if (item.Key == Game.Connection.LocalEndPoint?.ToString())
+                if (item.Key.Equals(Game.Connection.LocalEndPoint))
                 { color = CharColor.BrightMagenta; }
 
                 if (item.Value.Info != null)
@@ -190,18 +193,19 @@ public class GameScene : Scene
 
         if (Game.IsServer)
         {
-            foreach (string client in Game.Connection.Connections)
+            foreach (IPEndPoint client in Game.Connection.Connections)
             {
-                if (TryGetPlayer(client, out _))
+                string clientString = client.ToString();
+                if (TryGetPlayer(clientString, out _))
                 {
-                    _respawnTimers.Remove(client);
+                    _respawnTimers.Remove(clientString);
                 }
-                else if (!_respawnTimers.TryAdd(client, Time.Now) &&
-                         Time.Now - _respawnTimers[client] >= RespawnTime)
+                else if (!_respawnTimers.TryAdd(clientString, Time.Now) &&
+                         Time.Now - _respawnTimers[clientString] >= RespawnTime)
                 {
                     SpawnEntity(new Player()
                     {
-                        Owner = client,
+                        Owner = clientString,
                         NetworkId = GenerateNetworkId(),
                         Position = GetSpawnPoint(),
                     });
