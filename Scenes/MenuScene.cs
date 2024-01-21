@@ -9,7 +9,7 @@ public class MenuScene : Scene
 {
     public override string Name => "Menu";
 
-    ConsoleInputField InputSocket = new("127.0.0.1:5555");
+    ConsoleInputField InputSocket = new(Biscuit.Socket);
     string? InputSocketError = null;
     ConsoleInputField InputName = new("Bruh");
 
@@ -18,6 +18,7 @@ public class MenuScene : Scene
     public override void Load()
     {
         base.Load();
+        InputSocket.Value = new System.Text.StringBuilder(Biscuit.Socket);
     }
 
     public override void Unload()
@@ -45,18 +46,18 @@ public class MenuScene : Scene
         }
         else if (Game.Connection.State != ConnectionState.None)
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 4), new SmallRect(default, Game.Renderer.Rect));
-
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
-            box = box.Margin(1);
-
             string text = Game.Connection.State switch
             {
                 ConnectionState.Hosting => "Hosting",
-                ConnectionState.Connecting => "Connecting ...",
+                ConnectionState.Connecting => $"Connecting to {Game.Connection.RemoteEndPoint} ...",
                 ConnectionState.Connected => "Connected",
                 _ => "Bruh",
             };
+
+            SmallRect box = Layout.Center(new SmallSize(Math.Max(30, text.Length + 5), 4), new SmallRect(default, Game.Renderer.Rect));
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            box = box.Margin(1);
+
             int center = Layout.Center(box.Width, text);
             Game.Renderer.Text(box.Left + center, box.Top + 1, text);
         }
@@ -94,12 +95,17 @@ public class MenuScene : Scene
                     Username = InputName.Value.ToString(),
                 };
 
-                if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+                if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                 {
                     try
-                    { Game.Connection.StartClient(address, port); }
+                    {
+                        Game.Connection.StartClient(endPoint);
+                        Biscuit.Socket = InputSocket.Value.ToString();
+                    }
+                    catch (SocketException socketException)
+                    { InputSocketError = socketException.SocketErrorCode.ToString(); }
                     catch (Exception)
-                    { InputSocketError = "Bruh"; }
+                    { InputSocketError = "Internal Exception"; }
                 }
                 else
                 { InputSocketError = error; }
@@ -113,12 +119,17 @@ public class MenuScene : Scene
                     Username = InputName.Value.ToString(),
                 };
 
-                if (TryParseSocket(InputSocket.Value.ToString(), out IPAddress? address, out ushort port, out string? error))
+                if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                 {
                     try
-                    { Game.Connection.StartHost(address, port); }
+                    {
+                        Game.Connection.StartHost(endPoint);
+                        Biscuit.Socket = InputSocket.Value.ToString();
+                    }
+                    catch (SocketException socketException)
+                    { InputSocketError = socketException.SocketErrorCode.ToString(); }
                     catch (Exception)
-                    { InputSocketError = "Bruh"; }
+                    { InputSocketError = "Internal Exception"; }
                 }
                 else
                 { InputSocketError = error; }
@@ -133,12 +144,10 @@ public class MenuScene : Scene
 
     public static bool TryParseSocket(
         string input,
-        [NotNullWhen(true)] out IPAddress? address,
-        [NotNullWhen(true)] out ushort port,
+        [NotNullWhen(true)] out IPEndPoint? endPoint,
         [NotNullWhen(false)] out string? error)
     {
-        address = default;
-        port = default;
+        endPoint = default;
         error = default;
 
         if (string.IsNullOrWhiteSpace(input))
@@ -157,18 +166,7 @@ public class MenuScene : Scene
         ReadOnlySpan<char> left = input.AsSpan()[..colonIndex];
         ReadOnlySpan<char> right = input.AsSpan()[(colonIndex + 1)..];
 
-        if (!IPAddress.TryParse(left, out address))
-        {
-            IPHostEntry entry = Dns.GetHostEntry(left.ToString(), AddressFamily.InterNetwork);
-            if (entry.AddressList.Length == 0)
-            {
-                error = "Hostname not found";
-                return false;
-            }
-            address = entry.AddressList[0];
-        }
-
-        if (!ushort.TryParse(right, out port))
+        if (!ushort.TryParse(right, out ushort port))
         {
             error = "Bad formatted port";
             return false;
@@ -180,6 +178,18 @@ public class MenuScene : Scene
             return false;
         }
 
+        if (!IPAddress.TryParse(left, out IPAddress? address))
+        {
+            IPHostEntry entry = Dns.GetHostEntry(left.ToString(), AddressFamily.InterNetwork);
+            if (entry.AddressList.Length == 0)
+            {
+                error = "Hostname not found";
+                return false;
+            }
+            address = entry.AddressList[0];
+        }
+
+        endPoint = new IPEndPoint(address, port);
         return true;
     }
 }

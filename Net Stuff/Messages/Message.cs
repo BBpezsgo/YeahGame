@@ -8,6 +8,8 @@ public enum MessageType : byte
     RPC = 4,
     InfoResponse = 5,
     InfoRequest = 6,
+    HandshakeRequest = 7,
+    HandshakeResponse = 8,
 }
 
 public abstract class Message : ISerializable

@@ -87,11 +87,6 @@ public class Game
 
         _connection = new Connection<PlayerInfo>();
 
-        _connection.OnClientConnected += (client, phase) => Debug.WriteLine($"Client {client} connecting: {phase}");
-        _connection.OnClientDisconnected += (client) => Debug.WriteLine($"Client {client} disconnected");
-        _connection.OnConnectedToServer += (phase) => Debug.WriteLine($"Connected to server: {phase}");
-        _connection.OnDisconnectedFromServer += () => Debug.WriteLine($"Disconnected from server");
-
         MenuScene = new MenuScene();
         Scenes.Add(MenuScene);
 
@@ -129,38 +124,60 @@ public class Game
             Console.ResetColor();
         }
 
-        for (int i = 0; i < args.Length; i++)
+        if (false)
         {
-            if (args[i] == "--host")
+            for (int i = 0; i < args.Length; i++)
             {
-                i++;
-                if (i > args.Length)
+                if (args[i] == "--username")
                 {
-                    WriteError($"Expected socket after \"--host\"");
-                    return;
+                    i++;
+                    if (i > args.Length)
+                    {
+                        WriteError($"Expected text after \"--username\"");
+                        return;
+                    }
+
+                    _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
+                    continue;
                 }
 
-                if (!MenuScene.TryParseSocket(args[i], out IPAddress? address, out ushort port, out string? error))
+                if (args[i] == "--host")
                 {
-                    WriteError(error);
-                    return;
+                    i++;
+                    if (i > args.Length)
+                    {
+                        WriteError($"Expected socket after \"--host\"");
+                        return;
+                    }
+
+                    if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                    {
+                        WriteError(error);
+                        return;
+                    }
+
+                    _connection.StartHost(endPoint);
+                    continue;
                 }
 
-                _connection.StartHost(address, port);
-                continue;
-            }
-
-            if (args[i] == "--username")
-            {
-                i++;
-                if (i > args.Length)
+                if (args[i] == "--client")
                 {
-                    WriteError($"Expected text after \"--username\"");
-                    return;
-                }
+                    i++;
+                    if (i > args.Length)
+                    {
+                        WriteError($"Expected socket after \"--client\"");
+                        return;
+                    }
 
-                _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
-                continue;
+                    if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                    {
+                        WriteError(error);
+                        return;
+                    }
+
+                    _connection.StartClient(endPoint);
+                    continue;
+                }
             }
         }
 

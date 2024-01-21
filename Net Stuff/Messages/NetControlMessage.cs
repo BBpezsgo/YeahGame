@@ -4,8 +4,6 @@ namespace YeahGame.Messages;
 
 public enum NetControlMessageKind : byte
 {
-    HEY_IM_CLIENT_PLS_REPLY,
-    HEY_CLIENT_IM_SERVER,
     IM_THERE,
     PING,
     PONG,

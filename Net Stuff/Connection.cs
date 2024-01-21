@@ -138,22 +138,48 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     {
         get
         {
+            if (_client is null || _isServer) return null;
+
             try
-            { return (_client is null || _isServer) ? null : (IPEndPoint?)_client.Client.RemoteEndPoint; }
+            { return (IPEndPoint?)_client.Client.RemoteEndPoint; }
             catch (ObjectDisposedException)
             { return null; }
         }
     }
+
     public IPEndPoint? LocalEndPoint
     {
         get
         {
-            try
-            { return (_client is null) ? null : (IPEndPoint?)(_client.Client.LocalEndPoint); }
-            catch (ObjectDisposedException)
-            { return null; }
+            if (_client is null) return null;
+
+            if (_isServer)
+            {
+                try
+                { return (IPEndPoint?)_client.Client.LocalEndPoint; }
+                catch (ObjectDisposedException)
+                { return null; }
+            }
+            else
+            {
+                return _thisIsMe;
+            }
         }
     }
+
+    /*
+    public IPEndPoint? LocalEndPointExternal
+    {
+        get
+        {
+            IPEndPoint? localEndPoint = LocalEndPoint;
+            if (localEndPoint == null) return null;
+            IPAddress? externalAddress = Ipify.ExternalAddress;
+            if (externalAddress == null) return null;
+            return new IPEndPoint(externalAddress, localEndPoint.Port);
+        }
+    }
+    */
 
     public bool IsServer => _isServer;
 
@@ -170,7 +196,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             }
             else
             {
-                if (_shookHandsWithServer)
+                if (_thisIsMe is not null)
                 {
                     return ConnectionState.Connected;
                 }
@@ -184,7 +210,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     [MemberNotNullWhen(true, nameof(_client))]
     [MemberNotNullWhen(true, nameof(Client))]
-    public bool IsConnected => !_justListen && _client != null && (_isServer || _shookHandsWithServer);
+    public bool IsConnected => !_justListen && _client != null && (_isServer || _thisIsMe is not null);
 
     public UdpClient? Client => _client;
 
@@ -222,7 +248,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     bool _isServer;
     bool _justListen;
     bool _shouldListen;
-    bool _shookHandsWithServer;
+    IPEndPoint? _thisIsMe;
 
     int _sentBytes;
     int _receivedBytes;
@@ -232,14 +258,17 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
     #region Connection Handling
 
-    public void StartClient(IPAddress address, int port)
+    public void StartClient(IPEndPoint endPoint)
     {
         _client = new UdpClient();
-        _client.Connect(address, port);
+        _client.AllowNatTraversal(true);
+
+        Debug.WriteLine($"[Net]: Connecting to {endPoint} ...");
+        _client.Connect(endPoint);
 
         _justListen = false;
         _isServer = false;
-        _shookHandsWithServer = false;
+        _thisIsMe = null;
         _lostPackets = 0;
 
         _shouldListen = true;
@@ -250,16 +279,18 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _receivedAt = Time.NowNoCache;
         _sentAt = Time.NowNoCache;
 
-        Send(new NetControlMessage(NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY));
+        Debug.WriteLine($"[Net]: Shaking hands with {endPoint} ...");
+        Send(new HandshakeRequestMessage());
     }
 
     public void JustListen()
     {
         _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+        _client.AllowNatTraversal(true);
 
         _justListen = true;
         _isServer = false;
-        _shookHandsWithServer = false;
+        _thisIsMe = null;
         _lostPackets = 0;
 
         _shouldListen = true;
@@ -270,13 +301,14 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _sentAt = Time.NowNoCache;
     }
 
-    public void StartHost(IPAddress address, int port)
+    public void StartHost(IPEndPoint endPoint)
     {
-        _client = new UdpClient(new IPEndPoint(address, port));
+        _client = new UdpClient(endPoint);
+        _client.AllowNatTraversal(true);
 
         _justListen = false;
         _isServer = true;
-        _shookHandsWithServer = false;
+        _thisIsMe = null;
         _lostPackets = 0;
 
         _shouldListen = true;
@@ -303,6 +335,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     {
         if (_client is null) return;
 
+        Debug.WriteLine($"[Net]: Listening on {_client.Client.LocalEndPoint}");
+
         while (_shouldListen)
         {
             try
@@ -321,6 +355,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                     {
                         client = new ConnectionClient(source);
                         _connections.TryAdd(source, client);
+                        Debug.WriteLine($"[Net]: Client {source} sending the first message ...");
                         OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Connected);
                     }
 
@@ -353,8 +388,10 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _client?.Close();
         _client?.Dispose();
         _client = null;
-        _shookHandsWithServer = false;
+        _thisIsMe = null;
         _lostPackets = 0;
+
+        Debug.WriteLine($"[Net]: Closed");
 
         if (!_isServer)
         { OnDisconnectedFromServer?.Invoke(); }
@@ -364,41 +401,27 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
     {
         switch (netControlMessage.Kind)
         {
-            case NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY:
-            {
-                SendImmediateTo(new NetControlMessage(NetControlMessageKind.HEY_CLIENT_IM_SERVER), source);
-                if (_connections.TryGetValue(source, out ConnectionClient? client) &&
-                    !client.ShookHands)
-                {
-                    client.ShookHands = true;
-                    OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Handshake);
-                }
-                return;
-            }
-            case NetControlMessageKind.HEY_CLIENT_IM_SERVER:
-            {
-                OnConnectedToServer?.Invoke(Connection.ConnectingPhase.Handshake);
-                _shookHandsWithServer = true;
-                return;
-            }
             case NetControlMessageKind.IM_THERE:
             {
                 return;
             }
             case NetControlMessageKind.PING:
             {
-                Debug.WriteLine($"[Net]: =={source}=> PONG");
+                Debug.WriteLine($"[Net]: <= {source} == Ping");
+                Debug.WriteLine($"[Net]: == {source} => Pong");
                 SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
                 return;
             }
             case NetControlMessageKind.PONG:
             {
-                Debug.WriteLine($"[Net]: <={source}== PONG");
+                Debug.WriteLine($"[Net]: <= {source} == Pong");
                 return;
             }
 
             case NetControlMessageKind.ARE_U_SERVER:
             {
+                Debug.WriteLine($"[Net]: <= {source} == Are you a server?");
+
                 if (IsServer)
                 { SendImmediateTo(new NetControlMessage(NetControlMessageKind.YES_IM_SERVER), source); }
                 return;
@@ -406,6 +429,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
             case NetControlMessageKind.YES_IM_SERVER:
             {
+                Debug.WriteLine($"[Net]: <= {source} == I'm a server");
+
                 for (int i = 0; i < _discoveredServers.Count; i++)
                 {
                     if (_discoveredServers[i].Equals(source))
@@ -463,13 +488,13 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             if (Time.NowNoCache - client.Value.ReceivedAt > PingInterval &&
                 Time.NowNoCache - client.Value.SentAt > PingInterval)
             {
-                Debug.WriteLine($"[Net]: =={client.Value.EndPoint}=> PING");
+                Debug.WriteLine($"[Net]: == {client.Value.EndPoint} => Ping (idling more than {PingInterval} seconds)");
                 SendImmediateTo(new NetControlMessage(NetControlMessageKind.PING), client.Value.EndPoint);
             }
 
             if (Time.NowNoCache - client.Value.ReceivedAt > Timeout)
             {
-                Debug.WriteLine($"[Net]: Kicking client {client.Value.EndPoint} for idling too long");
+                Debug.WriteLine($"[Net]: Removing client {client.Value.EndPoint} for idling more than {Timeout} seconds");
                 shouldRemove.Add(client.Key);
                 continue;
             }
@@ -496,18 +521,18 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             }
         }
 
-        if (!_isServer)
+        if (!_isServer && _client is not null)
         {
             if (Time.NowNoCache - _receivedAt > PingInterval &&
                 Time.NowNoCache - _sentAt > PingInterval)
             {
-                Debug.WriteLine($"[Net]: =={RemoteEndPoint}=> PING");
+                Debug.WriteLine($"[Net]: == {RemoteEndPoint} => Ping (idling more than {PingInterval} seconds)");
                 SendImmediate(new NetControlMessage(NetControlMessageKind.PING));
             }
 
             if (Time.NowNoCache - _receivedAt > Timeout && _shouldListen)
             {
-                Debug.WriteLine($"[Net]: Server idling too long, disconnecting");
+                Debug.WriteLine($"[Net]: Server idling more than {Timeout} seconds, disconnecting ...");
                 Close();
             }
         }
@@ -534,7 +559,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
             if (value != message.Index)
             {
-                Debug.WriteLine($"LOST PACKET (expected {value} got {message.Index})");
+                Debug.WriteLine($"[Net]: Lost packet (expected {value} got {message.Index})");
                 _lostPackets++;
                 _receivingIndex[source] = message.Index;
             }
@@ -677,8 +702,42 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                     return;
                 }
 
-                default:
-                    throw new NotImplementedException();
+                case MessageType.HandshakeRequest:
+                {
+                    HandshakeRequestMessage _message = new(reader);
+
+                    Debug.WriteLine($"[Net]: <= {source} == Handshake Request");
+
+                    SendImmediateTo(new HandshakeResponseMessage()
+                    {
+                        ThisIsYou = source,
+                    }, source);
+
+                    if (_connections.TryGetValue(source, out ConnectionClient? client) &&
+                        !client.ShookHands)
+                    {
+                        client.ShookHands = true;
+                        Debug.WriteLine($"[Net]: Shook hands with client {source}");
+                        OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Handshake);
+                    }
+
+                    return;
+                }
+                case MessageType.HandshakeResponse:
+                {
+                    HandshakeResponseMessage _message = new(reader);
+
+                    Debug.WriteLine($"[Net]: <= {source} == Handshake Response (This is me: {_message.ThisIsYou})");
+
+                    Debug.WriteLine($"[Net]: Connected to {source} as {_message.ThisIsYou}");
+
+                    OnConnectedToServer?.Invoke(Connection.ConnectingPhase.Handshake);
+                    _thisIsMe = _message.ThisIsYou;
+
+                    return;
+                }
+
+                default: throw new NotImplementedException();
             }
 
             // Debug.WriteLine($"[Net]: <= {source} == {message}");
@@ -686,8 +745,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             HandleIndexing(message);
             _receivedPackets++;
 
-            if (!_isServer && !_shookHandsWithServer)
-            { SendImmediate(new NetControlMessage(NetControlMessageKind.HEY_IM_CLIENT_PLS_REPLY)); }
+            if (!_isServer && _thisIsMe is null)
+            { SendImmediate(new HandshakeRequestMessage()); }
 
             OnMessageReceived?.Invoke(message, source);
         }
