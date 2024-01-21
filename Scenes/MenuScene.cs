@@ -31,9 +31,9 @@ public class MenuScene : Scene
     {
         if (ExitReason is not null)
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 6), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(30, 6), new SmallRect(default, Game.Renderer.Size));
 
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1);
 
             int center = Layout.Center(box.Width, ExitReason);
@@ -54,8 +54,8 @@ public class MenuScene : Scene
                 _ => "Bruh",
             };
 
-            SmallRect box = Layout.Center(new SmallSize(Math.Max(30, text.Length + 5), 4), new SmallRect(default, Game.Renderer.Rect));
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            SmallRect box = Layout.Center(new SmallSize(Math.Max(30, text.Length + 5), 4), new SmallRect(default, Game.Renderer.Size));
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1);
 
             int center = Layout.Center(box.Width, text);
@@ -63,9 +63,9 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 11), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(30, 11), new SmallRect(default, Game.Renderer.Size));
 
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1, 2);
             int y = 1;
 
@@ -74,7 +74,7 @@ public class MenuScene : Scene
             Game.Renderer.InputField(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
                 Styles.TextFieldStyle,
-                ref InputSocket);
+                InputSocket);
 
             Game.Renderer.Text(box.Left, box.Top + y++, InputSocketError, CharColor.BrightRed);
 
@@ -83,7 +83,7 @@ public class MenuScene : Scene
             Game.Renderer.InputField(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
                 Styles.TextFieldStyle,
-                ref InputName);
+                InputName);
 
             y++;
 

@@ -299,7 +299,7 @@ public class Game
             }
 
             renderer.Fill(_debugPanel.Rect, 0, ' ');
-            renderer.Panel(_debugPanel, _debugPanel.IsActive ? CharColor.BrightCyan : CharColor.White, Ascii.PanelSides);
+            renderer.Panel(_debugPanel, _debugPanel.IsActive ? CharColor.BrightCyan : CharColor.White, in Ascii.PanelSides);
             ref SmallRect rect = ref _debugPanel.Rect;
 
             int y = rect.Y + 1;

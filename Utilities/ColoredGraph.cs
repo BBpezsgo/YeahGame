@@ -54,7 +54,7 @@ struct ColoredGraph
     {
         int max = Math.Max(rect.Height - 1, _max);
 
-        renderer.Box(rect, CharColor.Black, CharColor.Gray, Ascii.BoxSides);
+        renderer.Box(rect, CharColor.Black, CharColor.Gray, in Ascii.BoxSides);
 
         for (int i = 0; i < _records.Length; i++)
         {

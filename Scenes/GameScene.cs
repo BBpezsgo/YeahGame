@@ -120,10 +120,10 @@ public class GameScene : Scene
                 }
             }
 
-            SmallRect box = Layout.Center(new SmallSize(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Size));
 
             Game.Renderer.Clear(box);
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(2);
 
             int y = 0;
@@ -155,10 +155,10 @@ public class GameScene : Scene
         }
         else if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
         {
-            SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Rect));
+            SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Size));
 
             Game.Renderer.Fill(box, CharColor.Black, CharColor.Black, ' ');
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
 
             ReadOnlySpan<char> text1 = "YOU DIED";
             Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text1), box.Top + 2, text1, CharColor.BrightRed);

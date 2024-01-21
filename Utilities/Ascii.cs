@@ -1,4 +1,6 @@
-﻿namespace YeahGame;
+﻿using Win32.Common;
+
+namespace YeahGame;
 
 public static class Ascii
 {
@@ -374,131 +376,10 @@ public static class Ascii
         0.9999f,
     };
 
-    public static readonly char[] BoxSidesSimpleRound = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '|',  // 0b_0001
-        '-',  // 0b_0010
-        '/',  // 0b_0011
-        '|',  // 0b_0100
-        '|',  // 0b_0101 invalid
-        '\\', // 0b_0110
-        '|',  // 0b_0111 invalid
-        '-',  // 0b_1000
-        '\\', // 0b_1001
-        '-',  // 0b_1010 invalid
-        '-',  // 0b_1011 invalid
-        '/',  // 0b_1100
-        '|',  // 0b_1101 invalid
-        '-',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
-
-    public static readonly char[] BoxSidesSimple = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '|',  // 0b_0001
-        '-',  // 0b_0010
-        '+',  // 0b_0011
-        '|',  // 0b_0100
-        '|',  // 0b_0101 invalid
-        '+', // 0b_0110
-        '|',  // 0b_0111 invalid
-        '-',  // 0b_1000
-        '+', // 0b_1001
-        '-',  // 0b_1010 invalid
-        '-',  // 0b_1011 invalid
-        '+',  // 0b_1100
-        '|',  // 0b_1101 invalid
-        '-',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
-
-    public static readonly char[] BoxSides = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '│',  // 0b_0001
-        '─',  // 0b_0010
-        '┘',  // 0b_0011
-        '│',  // 0b_0100
-        '│',  // 0b_0101 invalid
-        '└',  // 0b_0110
-        '│',  // 0b_0111 invalid
-        '─',  // 0b_1000
-        '┐',  // 0b_1001
-        '─',  // 0b_1010 invalid
-        '─',  // 0b_1011 invalid
-        '┌',  // 0b_1100
-        '│',  // 0b_1101 invalid
-        '─',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
-
-    public static readonly char[] PanelSides = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '│',  // 0b_0001
-        '─',  // 0b_0010
-        '┘',  // 0b_0011
-        '│',  // 0b_0100
-        '│',  // 0b_0101 invalid
-        '└',  // 0b_0110
-        '│',  // 0b_0111 invalid
-        '═',  // 0b_1000
-        '╕',  // 0b_1001
-        '─',  // 0b_1010 invalid
-        '─',  // 0b_1011 invalid
-        '╒',  // 0b_1100
-        '│',  // 0b_1101 invalid
-        '─',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
-
-    public static readonly char[] BoxSidesDouble = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '║',  // 0b_0001
-        '═',  // 0b_0010
-        '╝',  // 0b_0011
-        '║',  // 0b_0100
-        '║',  // 0b_0101 invalid
-        '╚',  // 0b_0110
-        '║',  // 0b_0111 invalid
-        '═',  // 0b_1000
-        '╗',  // 0b_1001
-        '═',  // 0b_1010 invalid
-        '═',  // 0b_1011 invalid
-        '╔',  // 0b_1100
-        '║',  // 0b_1101 invalid
-        '═',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
-
-    public static readonly char[] BoxSidesShadow = new char[]
-    {
-        //          TLBR
-        ' ',  // 0b_0000
-        '║',  // 0b_0001
-        '═',  // 0b_0010
-        '╝',  // 0b_0011
-        '│',  // 0b_0100
-        '?',  // 0b_0101 invalid
-        '╘',  // 0b_0110
-        '?',  // 0b_0111 invalid
-        '─',  // 0b_1000
-        '╖',  // 0b_1001
-        '?',  // 0b_1010 invalid
-        '?',  // 0b_1011 invalid
-        '┌',  // 0b_1100
-        '?',  // 0b_1101 invalid
-        '?',  // 0b_1110 invalid
-        ' ',  // 0b_1111 invalid
-    };
+    public static readonly SideCharacters<char> BoxSides = new('┌', '┐', '┘', '└', '─', '│');
+    public static readonly SideCharacters<char> PanelSides = new('╒', '═', '╕', '│', '┘', '─', '└', '│');
+    public static readonly SideCharacters<char> BoxSidesDouble = new('╔', '╗', '╝', '╚', '═', '║');
+    public static readonly SideCharacters<char> BoxSidesShadow = new('┌', '─', '╖', '║', '╝', '═', '╘', '│');
 
     public static readonly char[] Stars = new char[]
     {
@@ -543,81 +424,106 @@ public static class Ascii
 
     public static readonly char[] Stuff1 = "¨`¯´˚˙˘˜˝΄΅·´῾῭΅`῝῞῟῁῀᾿᾽῏῎῍՚՛՜՝՞՟‘’‛“”‟\"'".ToCharArray();
 
-    public static readonly Dictionary<char, char> UpperIndex = new()
+    public static readonly Dictionary<char, char> UpperIndex = new() {
+        { '0', (char)0x2070 },
+        { '1', (char)0x00b9 },
+        { '2', (char)0x00b2 },
+        { '3', (char)0x00b3 },
+        { '4', (char)0x2074 },
+        { '5', (char)0x2075 },
+        { '6', (char)0x2076 },
+        { '7', (char)0x2077 },
+        { '8', (char)0x2078 },
+        { '9', (char)0x2079 },
+
+        { '+', (char)0x207a },
+        { '-', (char)0x207b },
+        { '=', (char)0x207c },
+        { '(', (char)0x207d },
+        { ')', (char)0x207e },
+        { '~', (char)0x02dc },
+
+        { 'a', (char)0x0363 },
+        // { 'a', (char)0x1d43 },
+        { 'b', (char)0x1d47 },
+        { 'c', (char)0x0368 },
+        // { 'd', (char)0x1d48 },
+        { 'd', (char)0x0369 },
+        // { 'e', (char)0x1d49 },
+        { 'e', (char)0x0364 },
+        { 'g', (char)0x1d4d },
+        // { 'h', (char)0x036a },
+        { 'h', (char)0x02b0 },
+        // { 'i', (char)0x0365 },
+        { 'i', (char)0x2071 },
+        { 'j', (char)0x02b2 },
+        { 'k', (char)0x1d4f },
+        { 'l', (char)0x02e1 },
+        // { 'm', (char)0x1d50 },
+        { 'm', (char)0x036b },
+        { 'n', (char)0x207f },
+        // { 'o', (char)0x1d52 },
+        { 'o', (char)0x0366 },
+        { 'p', (char)0x1d56 },
+        // { 'r', (char)0x036c },
+        { 'r', (char)0x02b3 },
+        { 's', (char)0x02e2 },
+        // { 't', (char)0x1d57 },
+        { 't', (char)0x036d },
+        // { 'u', (char)0x1d58 },
+        { 'u', (char)0x0367 },
+        // { 'v', (char)0x1d5b },
+        { 'v', (char)0x036e },
+        { 'w', (char)0x02b7 },
+        // { 'x', (char)0x036f },
+        { 'x', (char)0x02e3 },
+        { 'y', (char)0x02b8 },
+
+        { 'A', (char)0x1d2c },
+        { 'B', (char)0x1d2e },
+        { 'D', (char)0x1d30 },
+        { 'E', (char)0x1d31 },
+        { 'G', (char)0x1d33 },
+        { 'H', (char)0x1d34 },
+        { 'I', (char)0x1d35 },
+        { 'J', (char)0x1d36 },
+        { 'K', (char)0x1d37 },
+        { 'L', (char)0x1d38 },
+        { 'M', (char)0x1d39 },
+        { 'N', (char)0x1d3a },
+        { 'O', (char)0x1d3c },
+        { 'P', (char)0x1d3e },
+        { 'R', (char)0x1d3f },
+        { 'T', (char)0x1d40 },
+        { 'U', (char)0x1d41 },
+        { 'W', (char)0x1d42 },
+    };
+
+    public static string ToUpperIndex(string value)
+    {
+        Ascii.ToUpperIndex(value, out string result);
+        return result;
+    }
+    public static bool ToUpperIndex(string value, out string result)
+    {
+        Span<char> _result = stackalloc char[value.Length];
+        bool success = true;
+        for (int i = 0; i < value.Length; i++)
         {
-            { '0', (char)0x2070 },
-            { '1', (char)0x00b9 },
-            { '2', (char)0x00b2 },
-            { '3', (char)0x00b3 },
-            { '4', (char)0x2074 },
-            { '5', (char)0x2075 },
-            { '6', (char)0x2076 },
-            { '7', (char)0x2077 },
-            { '8', (char)0x2078 },
-            { '9', (char)0x2079 },
+            if (UpperIndex.TryGetValue(value[i], out char upperIndex))
+            {
+                _result[i] = upperIndex;
+            }
+            else
+            {
+                _result[i] = value[i];
+                success = false;
+            }
+        }
 
-            { '+', (char)0x207a },
-            { '-', (char)0x207b },
-            { '=', (char)0x207c },
-            { '(', (char)0x207d },
-            { ')', (char)0x207e },
-            { '~', (char)0x02dc },
-
-            { 'a', (char)0x0363 },
-            // { 'a', (char)0x1d43 },
-            { 'b', (char)0x1d47 },
-            { 'c', (char)0x0368 },
-            // { 'd', (char)0x1d48 },
-            { 'd', (char)0x0369 },
-            // { 'e', (char)0x1d49 },
-            { 'e', (char)0x0364 },
-            { 'g', (char)0x1d4d },
-            // { 'h', (char)0x036a },
-            { 'h', (char)0x02b0 },
-            // { 'i', (char)0x0365 },
-            { 'i', (char)0x2071 },
-            { 'j', (char)0x02b2 },
-            { 'k', (char)0x1d4f },
-            { 'l', (char)0x02e1 },
-            // { 'm', (char)0x1d50 },
-            { 'm', (char)0x036b },
-            { 'n', (char)0x207f },
-            // { 'o', (char)0x1d52 },
-            { 'o', (char)0x0366 },
-            { 'p', (char)0x1d56 },
-            // { 'r', (char)0x036c },
-            { 'r', (char)0x02b3 },
-            { 's', (char)0x02e2 },
-            // { 't', (char)0x1d57 },
-            { 't', (char)0x036d },
-            // { 'u', (char)0x1d58 },
-            { 'u', (char)0x0367 },
-            // { 'v', (char)0x1d5b },
-            { 'v', (char)0x036e },
-            { 'w', (char)0x02b7 },
-            // { 'x', (char)0x036f },
-            { 'x', (char)0x02e3 },
-            { 'y', (char)0x02b8 },
-
-            { 'A', (char)0x1d2c },
-            { 'B', (char)0x1d2e },
-            { 'D', (char)0x1d30 },
-            { 'E', (char)0x1d31 },
-            { 'G', (char)0x1d33 },
-            { 'H', (char)0x1d34 },
-            { 'I', (char)0x1d35 },
-            { 'J', (char)0x1d36 },
-            { 'K', (char)0x1d37 },
-            { 'L', (char)0x1d38 },
-            { 'M', (char)0x1d39 },
-            { 'N', (char)0x1d3a },
-            { 'O', (char)0x1d3c },
-            { 'P', (char)0x1d3e },
-            { 'R', (char)0x1d3f },
-            { 'T', (char)0x1d40 },
-            { 'U', (char)0x1d41 },
-            { 'W', (char)0x1d42 },
-        };
+        result = new string(_result);
+        return success;
+    }
 
     // public static char DirectionLine(Vector dir)
     //     => DirectionLine(Vector.ToDeg(dir));
