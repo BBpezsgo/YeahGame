@@ -70,7 +70,6 @@ struct Graph
         if (labels)
         {
             renderer.Text(rect.Right + 1, rect.Top, _max.ToString(), CharColor.Gray);
-            renderer.Text(rect.Right + 1, rect.Bottom, _min.ToString(), CharColor.Gray);
         }
     }
 }

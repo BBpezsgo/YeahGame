@@ -38,7 +38,7 @@ public class MenuScene : Scene
             int center = Layout.Center(box.Width, ExitReason);
             Game.Renderer.Text(box.Left + center, box.Top + 1, ExitReason);
 
-            if (Game.Renderer.Button(new SmallRect(box.X, box.Top + 3, box.Width, 1), "OK", Utils.ButtonStyle))
+            if (Game.Renderer.Button(new SmallRect(box.X, box.Top + 3, box.Width, 1), "OK", Styles.ButtonStyle))
             {
                 ExitReason = null;
             }
@@ -65,30 +65,28 @@ public class MenuScene : Scene
             SmallRect box = Layout.Center(new SmallSize(30, 11), new SmallRect(default, Game.Renderer.Rect));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, Ascii.BoxSides);
+            box = box.Margin(1, 2);
+            int y = 1;
 
-            Game.Renderer.Text(box.Left + 2, box.Top + 2, "Socket:");
+            Game.Renderer.Text(box.Left, box.Top + y++, "Socket:");
 
             Game.Renderer.InputField(
-                new SmallRect(box.Left + 2, box.Top + 3, box.Width - 4, 1),
-                Utils.TextFieldStyle,
+                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                Styles.TextFieldStyle,
                 ref InputSocket);
 
-            Game.Renderer.Text(box.Left + 2, box.Top + 4, InputSocketError, CharColor.BrightRed);
+            Game.Renderer.Text(box.Left, box.Top + y++, InputSocketError, CharColor.BrightRed);
 
-            Game.Renderer.Text(box.Left + 2, box.Top + 5, "Username:");
+            Game.Renderer.Text(box.Left, box.Top + y++, "Username:");
 
             Game.Renderer.InputField(
-                new SmallRect(box.Left + 2, box.Top + 6, box.Width - 4, 1),
-                Utils.TextFieldStyle,
+                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                Styles.TextFieldStyle,
                 ref InputName);
 
-            if (Game.Renderer.Button(
-                Layout.Center(
-                    new SmallSize(10, 1),
-                    new SmallRect(box.Left, box.Top + 7, box.Width, 1)
-                    ),
-                "Connect",
-                Utils.ButtonStyle))
+            y++;
+
+            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.ButtonStyle))
             {
                 InputSocketError = null;
                 Game.Connection.LocalUserInfo = new PlayerInfo()
@@ -107,13 +105,7 @@ public class MenuScene : Scene
                 { InputSocketError = error; }
             }
 
-            if (Game.Renderer.Button(
-                Layout.Center(
-                    new SmallSize(10, 1),
-                    new SmallRect(box.Left, box.Top + 8, box.Width, 1)
-                    ),
-                "Host",
-                Utils.ButtonStyle))
+            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
             {
                 InputSocketError = null;
                 Game.Connection.LocalUserInfo = new PlayerInfo()

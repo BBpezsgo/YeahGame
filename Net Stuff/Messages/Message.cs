@@ -13,6 +13,10 @@ public enum MessageType : byte
 public abstract class Message : ISerializable
 {
     MessageType _type;
+    /// <summary>
+    /// <b>DO NOT SET IT!</b><br/>
+    /// It is handled by the <see cref="Connection"/>
+    /// </summary>
     public uint Index;
 
     public MessageType Type => _type;

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Text;
 using Win32.Common;
 using YeahGame.Messages;
 
@@ -104,12 +105,12 @@ public class GameScene : Scene
 
         if (Keyboard.IsKeyHold('\t'))
         {
-            IReadOnlyDictionary<string, (PlayerInfo Info, bool IsServer)> infos = Game.Connection.PlayerInfos;
+            IReadOnlyDictionary<string, ConnectionUserInfo<PlayerInfo>> infos = Game.Connection.UserInfos;
 
             bool selfContained = false;
             if (!Game.Connection.IsServer)
             {
-                foreach (KeyValuePair<string, (PlayerInfo Info, bool IsServer)> item in infos)
+                foreach (KeyValuePair<string, ConnectionUserInfo<PlayerInfo>> item in infos)
                 {
                     if (item.Key == Game.Connection.LocalEndPoint?.ToString())
                     {
@@ -130,16 +131,29 @@ public class GameScene : Scene
             if (!selfContained)
             { Game.Renderer.Text(box.Left, box.Top + y++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalEndPoint}){(Game.Connection.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
 
-            foreach (KeyValuePair<string, (PlayerInfo Info, bool IsServer)> item in infos)
+            foreach (KeyValuePair<string, ConnectionUserInfo<PlayerInfo>> item in infos)
             {
+                StringBuilder builder = new();
+                byte color = CharColor.White;
+
                 if (item.Key == Game.Connection.LocalEndPoint?.ToString())
-                { Game.Renderer.Text(box.Left, box.Top + y++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
-                else
-                { Game.Renderer.Text(box.Left, box.Top + y++, $"{item.Value.Info.Username} ({item.Key}){(item.Value.IsServer ? " (Server)" : string.Empty)}", CharColor.White); }
+                { color = CharColor.BrightMagenta; }
+
+                if (item.Value.Info != null)
+                { builder.Append($"{item.Value.Info.Username} "); }
+
+                builder.Append($"({item.Key})");
+
+                if (item.Value.IsServer)
+                { builder.Append(" (Server)"); }
+
+                if (item.Value.IsRefreshing)
+                { builder.Append(" (Refreshing ...)"); }
+
+                Game.Renderer.Text(box.Left, box.Top + y++, builder.ToString(), color);
             }
         }
-
-        if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
+        else if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
         {
             SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Rect));
 
