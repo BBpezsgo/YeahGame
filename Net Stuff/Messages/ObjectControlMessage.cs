@@ -25,7 +25,7 @@ public enum ObjectControlMessageKind : byte
     Info = 4,
 }
 
-public class ObjectControlMessage : Message
+public class ObjectControlMessage : ReliableMessage
 {
     public required ObjectControlMessageKind Kind { get; set; }
     public int ObjectId { get; set; }
@@ -67,5 +67,18 @@ public class ObjectControlMessage : Message
         ObjectControlMessageKind.NotFound => $"{{ {Kind} {ObjectId} }} {base.ToString()}",
         ObjectControlMessageKind.Info => $"{{ {Kind} {EntityPrototype} {ObjectId} }} {base.ToString()}",
         _ => throw new NotImplementedException(),
+    };
+
+    public override ObjectControlMessage Copy() => new()
+    {
+        Index = Index,
+
+        ShouldAck = ShouldAck,
+        Callback = Callback,
+
+        Kind = Kind,
+        ObjectId = ObjectId,
+        EntityPrototype = EntityPrototype,
+        Details = Details,
     };
 }

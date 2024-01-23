@@ -2,7 +2,7 @@
 
 namespace YeahGame.Messages;
 
-public class RPCMessage : Message
+public class RPCMessage : ReliableMessage
 {
     public required int ObjectId { get; set; }
     public required int RPCId { get; set; }
@@ -35,4 +35,16 @@ public class RPCMessage : Message
     }
 
     public override string ToString() => $"{{ {ObjectId} }} {base.ToString()}";
+
+    public override RPCMessage Copy() => new()
+    {
+        Index = Index,
+
+        ShouldAck = ShouldAck,
+        Callback = Callback,
+
+        ObjectId = ObjectId,
+        RPCId = RPCId,
+        Details = Details,
+    };
 }

@@ -9,9 +9,9 @@ public class MenuScene : Scene
 {
     public override string Name => "Menu";
 
-    ConsoleInputField InputSocket = new(Biscuit.Socket);
+    readonly ConsoleInputField InputSocket = new(Biscuit.Socket);
     string? InputSocketError = null;
-    ConsoleInputField InputName = new("Bruh");
+    readonly ConsoleInputField InputName = new("Bruh");
 
     public string? ExitReason;
 
@@ -73,7 +73,7 @@ public class MenuScene : Scene
 
             Game.Renderer.InputField(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
-                Styles.TextFieldStyle,
+                Styles.InputFieldStyle,
                 InputSocket);
 
             Game.Renderer.Text(box.Left, box.Top + y++, InputSocketError, CharColor.BrightRed);
@@ -82,7 +82,7 @@ public class MenuScene : Scene
 
             Game.Renderer.InputField(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
-                Styles.TextFieldStyle,
+                Styles.InputFieldStyle,
                 InputName);
 
             y++;

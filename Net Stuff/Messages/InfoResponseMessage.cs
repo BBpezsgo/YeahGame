@@ -3,7 +3,7 @@ using System.Net;
 
 namespace YeahGame.Messages;
 
-public class InfoResponseMessage : Message
+public class InfoResponseMessage : ReliableMessage
 {
     public required bool IsServer { get; set; }
     public required IPEndPoint? Source { get; set; }
@@ -36,4 +36,16 @@ public class InfoResponseMessage : Message
     }
 
     public override string ToString() => $"{{ {(Source is null ? "null" : Source.ToString())} }} {base.ToString()}";
+
+    public override InfoResponseMessage Copy() => new()
+    {
+        Index = Index,
+
+        ShouldAck = ShouldAck,
+        Callback = Callback,
+
+        IsServer = IsServer,
+        Source = Source,
+        Details = Details,
+    };
 }

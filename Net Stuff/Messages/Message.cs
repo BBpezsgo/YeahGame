@@ -10,9 +10,11 @@ public enum MessageType : byte
     InfoRequest = 6,
     HandshakeRequest = 7,
     HandshakeResponse = 8,
+    ReliableMessageReceived = 9,
+    ChatMessage = 10,
 }
 
-public abstract class Message : ISerializable
+public abstract class Message : ISerializable, ICopyable<Message>
 {
     MessageType _type;
     /// <summary>
@@ -39,4 +41,5 @@ public abstract class Message : ISerializable
     }
 
     public override string ToString() => $"{{ {_type} }}";
+    public abstract Message Copy();
 }

@@ -8,4 +8,9 @@ public class HandshakeRequestMessage : Message
 
     [SetsRequiredMembers]
     public HandshakeRequestMessage(BinaryReader reader) : this() => Deserialize(reader);
+
+    public override HandshakeRequestMessage Copy() => new()
+    {
+        Index = Index,
+    };
 }

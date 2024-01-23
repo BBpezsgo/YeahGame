@@ -29,4 +29,10 @@ public class HandshakeResponseMessage : Message
     }
 
     public override string ToString() => $"{{ {ThisIsYou} }} {base.ToString()}";
+
+    public override HandshakeResponseMessage Copy() => new()
+    {
+        Index = Index,
+        ThisIsYou = ThisIsYou,
+    };
 }

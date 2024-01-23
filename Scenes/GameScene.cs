@@ -23,6 +23,8 @@ public class GameScene : Scene
 
     public bool ShouldSync => Time.Now - LastNetworkSync >= SyncInterval;
 
+    public Chat Chat = new();
+
     public IReadOnlyList<Player?> Players => _players;
     public IReadOnlyList<Projectile?> Projectiles => _projectiles;
     public IReadOnlyList<NetworkEntity?> NetworkEntities => _networkEntities;
@@ -105,6 +107,8 @@ public class GameScene : Scene
         //         Position = Mouse.RecordedConsolePosition,
         //     });
         // }
+
+        Chat.Render();
 
         if (Keyboard.IsKeyHold('\t'))
         {
@@ -411,6 +415,16 @@ public class GameScene : Scene
 
     public void OnMessageReceived(Message message, IPEndPoint source)
     {
+        if (message is ChatMessage chatMessage)
+        {
+            Chat.Feed(chatMessage, source);
+
+            if (Game.IsServer)
+            { Game.Connection.Send(message); }
+
+            return;
+        }
+
         if (message is ObjectSyncMessage objectMessage)
         {
             if (TryGetNetworkEntity(objectMessage.ObjectId, out NetworkEntity? entity))

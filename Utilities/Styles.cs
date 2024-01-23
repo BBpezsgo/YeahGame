@@ -9,7 +9,7 @@ public static class Styles
         Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
     };
 
-    public static readonly ConsoleInputFieldStyle TextFieldStyle = new()
+    public static readonly ConsoleInputFieldStyle InputFieldStyle = new()
     {
         Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
         Active = CharColor.Make(CharColor.Black, CharColor.White),

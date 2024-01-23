@@ -32,4 +32,11 @@ public class ObjectSyncMessage : Message
     }
 
     public override string ToString() => $"{{ {ObjectId} }} {base.ToString()}";
+
+    public override ObjectSyncMessage Copy() => new()
+    {
+        Index = Index,
+        ObjectId = ObjectId,
+        Details = Details,
+    };
 }

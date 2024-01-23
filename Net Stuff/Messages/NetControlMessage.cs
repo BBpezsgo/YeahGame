@@ -11,7 +11,7 @@ public enum NetControlMessageKind : byte
     YES_IM_SERVER,
 }
 
-public class NetControlMessage : Message
+public class NetControlMessage : ReliableMessage
 {
     public required NetControlMessageKind Kind { get; set; }
 
@@ -37,4 +37,14 @@ public class NetControlMessage : Message
         base.Deserialize(reader);
         Kind = (NetControlMessageKind)reader.ReadByte();
     }
+
+    public override NetControlMessage Copy() => new()
+    {
+        Index = Index,
+        
+        ShouldAck = ShouldAck,
+        Callback = Callback,
+
+        Kind = Kind,
+    };
 }
