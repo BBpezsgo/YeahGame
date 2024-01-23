@@ -27,6 +27,7 @@ public class GameScene : Scene
 
     public IReadOnlyList<Player?> Players => _players;
     public IReadOnlyList<Projectile?> Projectiles => _projectiles;
+    public IReadOnlyList<Item?> Items => _items;
     public IReadOnlyList<NetworkEntity?> NetworkEntities => _networkEntities;
     public IReadOnlyList<Entity> Entities => _entities;
 
@@ -42,6 +43,7 @@ public class GameScene : Scene
 
     readonly WeakList<Player> _players = new();
     readonly WeakList<Projectile> _projectiles = new();
+    readonly WeakList<Item> _items = new();
     readonly WeakList<NetworkEntity> _networkEntities = new();
     readonly List<Entity> _entities = new();
 
@@ -60,10 +62,23 @@ public class GameScene : Scene
         {
             SpawnEntity(new Player()
             {
-                Owner = Game.Connection.LocalEndPoint!.ToString(),
+                Owner = Game.Connection.LocalEndPoint,
                 NetworkId = GenerateNetworkId(),
                 Position = GetSpawnPoint(),
             });
+
+            const int SpawnItems = 10;
+
+            for (int i = 0; i < SpawnItems; i++)
+            {
+                Vector2 position = Random.Shared.NextVector2(new Vector2(10, 10), new Vector2(50, 50));
+                SpawnEntity(new Item()
+                {
+                    NetworkId = GenerateNetworkId(),
+                    Position = position,
+                    Type = ItemType.Item1,
+                });
+            }
 
             // for (int i = 0; i < 5; i++)
             // {
@@ -173,6 +188,16 @@ public class GameScene : Scene
             ReadOnlySpan<char> text2 = $"Respawn in {Math.Max(0f, RespawnTime - (Time.Now - LocalRespawnTimer)):0.0} sec ...";
             Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text2), box.Top + 4, text2, CharColor.White);
         }
+        else if (Game.Connection.LocalUserInfo is not null)
+        {
+            PlayerInfo info = Game.Connection.LocalUserInfo;
+            int y = Game.Renderer.Height - 2;
+            for (int i = 0; i < info.Items.Value.Count; i++)
+            {
+                ItemType item = info.Items.Value[i];
+                Game.Renderer.Text(Game.Renderer.Width - 10, y--, item.ToString());
+            }
+        }
     }
 
     public override void Tick()
@@ -200,7 +225,7 @@ public class GameScene : Scene
             foreach (IPEndPoint client in Game.Connection.Connections)
             {
                 string clientString = client.ToString();
-                if (TryGetPlayer(clientString, out _))
+                if (TryGetPlayer(client, out _))
                 {
                     _respawnTimers.Remove(clientString);
                 }
@@ -209,7 +234,7 @@ public class GameScene : Scene
                 {
                     SpawnEntity(new Player()
                     {
-                        Owner = clientString,
+                        Owner = client,
                         NetworkId = GenerateNetworkId(),
                         Position = GetSpawnPoint(),
                     });
@@ -227,7 +252,7 @@ public class GameScene : Scene
                 {
                     SpawnEntity(new Player()
                     {
-                        Owner = local,
+                        Owner = Game.Connection.LocalEndPoint,
                         NetworkId = GenerateNetworkId(),
                         Position = GetSpawnPoint(),
                     });
@@ -271,6 +296,7 @@ public class GameScene : Scene
             {
                 Kind = ObjectControlMessageKind.Destroy,
                 ObjectId = networkEntity.NetworkId,
+                ShouldAck = true,
             });
         }
 
@@ -284,6 +310,9 @@ public class GameScene : Scene
 
         if (entity is Projectile projectile)
         { _projectiles.Remove(projectile); }
+
+        if (entity is Item item)
+        { _items.Remove(item); }
 
         if (entity is NetworkEntity networkEntity)
         { _networkEntities.Remove(networkEntity); }
@@ -318,6 +347,9 @@ public class GameScene : Scene
         if (entity is Projectile projectile)
         { _projectiles.Add(projectile); }
 
+        if (entity is Item item)
+        { _items.Add(item); }
+
         if (entity is NetworkEntity networkEntity)
         { _networkEntities.Add(networkEntity); }
     }
@@ -339,18 +371,18 @@ public class GameScene : Scene
     }
 
     public bool TryGetLocalPlayer([NotNullWhen(true)] out Player? player)
-        => TryGetPlayer(Game.Connection.LocalEndPoint?.ToString(), out player);
+        => TryGetPlayer(Game.Connection.LocalEndPoint, out player);
 
-    public bool TryGetPlayer(string? owner, [NotNullWhen(true)] out Player? player)
+    public bool TryGetPlayer(IPEndPoint? owner, [NotNullWhen(true)] out Player? player)
     {
         player = null;
 
-        if (owner == null) return false;
+        if (owner is null) return false;
 
         for (int i = 0; i < Players.Count; i++)
         {
             Player? _player = Players[i];
-            if (_player != null && _player.Owner == owner)
+            if (_player != null && owner.Equals(_player.Owner))
             {
                 player = _player;
                 return true;
@@ -374,14 +406,14 @@ public class GameScene : Scene
         for (int i = Players.Count - 1; i >= 0; i--)
         {
             Player? player = Players[i];
-            if (player != null && player.Owner == client.ToString())
+            if (player != null && client.Equals(player.Owner))
             { DestroyEntity(player); }
         }
     }
 
-    public void OnClientConnected(IPEndPoint client, Connection.ConnectingPhase phase)
+    public void OnClientConnected(IPEndPoint client, ConnectingPhase phase)
     {
-        if (phase != Connection.ConnectingPhase.Handshake) return;
+        if (phase != ConnectingPhase.Handshake) return;
         if (!Game.Connection.IsServer) return;
 
         Game.Connection.SendTo(new InfoRequestMessage()
@@ -407,7 +439,7 @@ public class GameScene : Scene
 
         SpawnEntity(new Player()
         {
-            Owner = client.ToString(),
+            Owner = client,
             NetworkId = GenerateNetworkId(),
             Position = GetSpawnPoint(),
         });
@@ -601,6 +633,7 @@ public class GameScene : Scene
         {
             EntityPrototype.Player => new Player(),
             EntityPrototype.Tester => new Tester(),
+            EntityPrototype.Item => new Item(),
             _ => throw new NotImplementedException(),
         };
 
@@ -618,6 +651,30 @@ public class GameScene : Scene
     Vector2 GetSpawnPoint()
     {
         return Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(10f, 10f));
+    }
+
+    public bool OnItemPickedUp(Item item, string owner)
+        => OnItemPickedUp(item, IPEndPoint.Parse(owner));
+    public bool OnItemPickedUp(Item item, IPEndPoint owner)
+    {
+        if (!Game.IsServer) return false;
+
+        if (Game.Connection.TryGetUserInfo(owner, out ConnectionUserInfo<PlayerInfo> userInfo) &&
+            userInfo.Info is not null)
+        {
+            userInfo.Info.Items.Value.Add(item.Type);
+            userInfo.Info.Items.WasChanged = true;
+
+            Game.Connection.Send(new InfoResponseMessage()
+            {
+                IsServer = owner.Equals(Game.Connection.LocalEndPoint),
+                Source = owner,
+                Details = Utils.Serialize(userInfo.Info),
+            });
+            return true;
+        }
+
+        return false;
     }
 
     #endregion

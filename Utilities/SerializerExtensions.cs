@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 
 namespace YeahGame;
 
@@ -8,6 +9,27 @@ public static class SerializerExtensions
     {
         writer.Write(value.X);
         writer.Write(value.Y);
+    }
+
+    public static void Write<T>(this BinaryWriter _writer, IReadOnlyCollection<T> values, Action<BinaryWriter, T> writer)
+    {
+        _writer.Write(values.Count);
+        foreach (T item in values)
+        { writer.Invoke(_writer, item); }
+    }
+
+    public static void Write<T>(this BinaryWriter _writer, IReadOnlyCollection<T> values, Action<T> writer)
+    {
+        _writer.Write(values.Count);
+        foreach (T item in values)
+        { writer.Invoke(item); }
+    }
+
+    public static void Write<T>(this BinaryWriter writer, IReadOnlyCollection<T> values) where T : ISerializable
+    {
+        writer.Write(values.Count);
+        foreach (T item in values)
+        { item.Serialize(writer); }
     }
 
     public static Vector2 ReadVector2(this BinaryReader reader)
@@ -69,5 +91,36 @@ public static class SerializerExtensions
         {
             return default;
         }
+    }
+
+    public static T[] ReadCollection<T>(this BinaryReader _reader, Func<BinaryReader, T> reader)
+    {
+        int count = _reader.ReadInt32();
+        T[] result = new T[count];
+        for (int i = 0; i < count; i++)
+        { result[i] = reader.Invoke(_reader); }
+        return result;
+    }
+
+    public static T[] ReadCollection<T>(this BinaryReader _reader, Func<T> reader)
+    {
+        int count = _reader.ReadInt32();
+        T[] result = new T[count];
+        for (int i = 0; i < count; i++)
+        { result[i] = reader.Invoke(); }
+        return result;
+    }
+
+    public static T[] ReadCollection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(this BinaryReader _reader) where T : ISerializable
+    {
+        int count = _reader.ReadInt32();
+        T[] result = new T[count];
+        for (int i = 0; i < count; i++)
+        {
+            T item = Activator.CreateInstance<T>();
+            item.Deserialize(_reader);
+            result[i] = item;
+        }
+        return result;
     }
 }

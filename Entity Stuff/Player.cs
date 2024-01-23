@@ -1,4 +1,5 @@
-﻿using YeahGame.Messages;
+﻿using System.Net;
+using YeahGame.Messages;
 
 namespace YeahGame;
 
@@ -11,11 +12,11 @@ public class Player : NetworkEntity
     const float ReloadTime = .5f;
     static readonly float InverseSqrt2 = 1f / MathF.Sqrt(2f);
 
-    public bool IsLocalOwned => Game.Connection.LocalEndPoint?.ToString() == Owner;
+    public bool IsLocalOwned => Game.Connection.LocalEndPoint?.Equals(Owner) ?? false;
     public override EntityPrototype Prototype => EntityPrototype.Player;
 
     public float HP = 1;
-    public string? Owner;
+    public IPEndPoint? Owner;
     float LastShot = Time.Now;
 
     Vector2 NetPosition;
@@ -23,6 +24,23 @@ public class Player : NetworkEntity
 
     public override void Update()
     {
+        if (Game.IsServer && Owner is not null)
+        {
+            IReadOnlyList<Item?> items = Game.Singleton.GameScene.Items;
+            for (int i = 0; i < items.Count; i++)
+            {
+                Item? item = items[i];
+                if (item is null) continue;
+
+                if (Vector2.Distance(item.Position, Position) < 2)
+                {
+                    if (Game.Singleton.GameScene.OnItemPickedUp(item, Owner))
+                    { Game.Singleton.GameScene.DestroyEntity(item); }
+                    continue;
+                }
+            }
+        }
+
         if (!IsLocalOwned) return;
 
         if (!Game.Singleton.GameScene.Chat.IsChatting)
@@ -117,7 +135,7 @@ public class Player : NetworkEntity
             Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) &&
             info.Info != null)
         {
-            Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username);
+            Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username.Value);
         }
     }
 
@@ -181,7 +199,7 @@ public class Player : NetworkEntity
 
     public override void NetworkDeserialize(BinaryReader reader)
     {
-        Owner = reader.ReadString();
+        Owner = reader.ReadIPEndPoint();
         Position = reader.ReadVector2();
     }
 

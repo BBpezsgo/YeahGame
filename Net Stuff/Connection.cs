@@ -13,26 +13,17 @@ namespace YeahGame;
 
 public class Connection
 {
-    public enum ConnectingPhase
-    {
-        Connected,
-        Handshake,
-    }
-
     public delegate void ClientConnectedEventHandler(IPEndPoint client, ConnectingPhase phase);
     public delegate void ClientDisconnectedEventHandler(IPEndPoint client);
     public delegate void ConnectedToServerEventHandler(ConnectingPhase phase);
     public delegate void DisconnectedFromServerEventHandler();
     public delegate void MessageReceivedEventHandler(Message message, IPEndPoint source);
+}
 
-    public static void Broadcast(Message message, int port)
-        => Broadcast(Utils.Serialize(message), port);
-
-    public static void Broadcast(byte[] data, int port)
-    {
-        using UdpClient udpClient = new();
-        udpClient.Send(data, data.Length, new IPEndPoint(IPAddress.Broadcast, port));
-    }
+public enum ConnectingPhase
+{
+    Connected,
+    Handshake,
 }
 
 public enum ConnectionState
@@ -270,7 +261,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
         _shouldListen = true;
         _listeningThread = new Thread(Listen) { Name = "UDP Listener" };
         _listeningThread.Start();
-        OnConnectedToServer?.Invoke(Connection.ConnectingPhase.Connected);
+        OnConnectedToServer?.Invoke(ConnectingPhase.Connected);
 
         _receivedAt = Time.NowNoCache;
         _sentAt = Time.NowNoCache;
@@ -324,7 +315,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                         client = new ConnectionClient(source);
                         _connections.TryAdd(source, client);
                         Debug.WriteLine($"[Net]: Client {source} sending the first message ...");
-                        OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Connected);
+                        OnClientConnected?.Invoke(source, ConnectingPhase.Connected);
                     }
 
                     client.ReceivedAt = Time.NowNoCache;
@@ -573,18 +564,30 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                     if (IsServer)
                     {
                         if (_message.Source is not null)
-                        { _userInfos[_message.Source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache); }
+                        {
+                            _userInfos[_message.Source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache);
+                        }
                         else
-                        { _userInfos[source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache); }
+                        {
+                            _userInfos[source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache);
+                        }
 
                         Send(_message);
                     }
                     else
                     {
-                        if (_message.Source is not null)
-                        { _userInfos[_message.Source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache); }
+                        if (_message.Source is not null &&
+                            !_message.IsServer)
+                        {
+                            TUserInfo data = Utils.Deserialize<TUserInfo>(_message.Details);
+                            _userInfos[_message.Source] = new ConnectionUserInfoPrivate(data, false, (float)Time.NowNoCache);
+                            if (_message.Source.Equals(LocalEndPoint))
+                            { LocalUserInfo = data; }
+                        }
                         else if (_message.IsServer && RemoteEndPoint is not null)
-                        { _userInfos[RemoteEndPoint] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), true, (float)Time.NowNoCache); }
+                        {
+                            _userInfos[RemoteEndPoint] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), true, (float)Time.NowNoCache);
+                        }
                     }
 
                     return;
@@ -687,7 +690,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
                     {
                         client.ShookHands = true;
                         Debug.WriteLine($"[Net]: Shook hands with client {source}");
-                        OnClientConnected?.Invoke(source, Connection.ConnectingPhase.Handshake);
+                        OnClientConnected?.Invoke(source, ConnectingPhase.Handshake);
                     }
 
                     return;
@@ -701,7 +704,7 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
 
                     Debug.WriteLine($"[Net]: Connected to {source} as {_message.ThisIsYou}");
 
-                    OnConnectedToServer?.Invoke(Connection.ConnectingPhase.Handshake);
+                    OnConnectedToServer?.Invoke(ConnectingPhase.Handshake);
                     _thisIsMe = _message.ThisIsYou;
 
                     return;
@@ -1053,7 +1056,8 @@ public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTyp
             return true;
         }
 
-        if (LocalUserInfo != null)
+        if (owner.Equals(LocalEndPoint) &&
+            LocalUserInfo != null)
         {
             info = new ConnectionUserInfo<TUserInfo>(LocalUserInfo, _isServer, false);
             return true;
