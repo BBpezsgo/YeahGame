@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Runtime.InteropServices;
 using Win32.LowLevel;
 
 namespace YeahGame;
@@ -50,9 +51,9 @@ public class Game
     #region Public Static Stuff
 
     public static Game Singleton => singleton!;
-    public static ConsoleRenderer Renderer => singleton!.renderer;
+    public static IRenderer<ConsoleChar> Renderer => singleton!.renderer;
     public static bool IsServer => singleton!._connection.IsServer;
-    public static Connection<PlayerInfo> Connection => singleton!._connection;
+    public static ConnectionBase<PlayerInfo> Connection => singleton!._connection;
 
     #endregion
 
@@ -60,9 +61,9 @@ public class Game
 
     static Game? singleton;
 
-    readonly ConsoleRenderer renderer;
+    readonly IRenderer<ConsoleChar> renderer;
 
-    readonly Connection<PlayerInfo> _connection;
+    readonly ConnectionBase<PlayerInfo> _connection;
 
     readonly ConsoleDropdown _fpsDropdown = new();
     readonly ConsoleDropdown _sentBytesDropdown = new();
@@ -96,15 +97,15 @@ public class Game
     public readonly MenuScene MenuScene;
     public readonly GameScene GameScene;
 
-    public Game()
+    public Game(IRenderer<ConsoleChar> _renderer, ConnectionBase<PlayerInfo> connection)
     {
         singleton = this;
 
-        renderer = new ConsoleRenderer();
+        renderer = _renderer;
 
         _currentFps.Reset();
 
-        _connection = new Connection<PlayerInfo>();
+        _connection = connection;
 
         MenuScene = new MenuScene();
         Scenes.Add(MenuScene);
@@ -143,76 +144,79 @@ public class Game
             Console.ResetColor();
         }
 
-        if (false)
-        {
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (args[i] == "--username")
-                {
-                    i++;
-                    if (i > args.Length)
-                    {
-                        WriteError($"Expected text after \"--username\"");
-                        return;
-                    }
-
-                    _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
-                    continue;
-                }
-
-                if (args[i] == "--host")
-                {
-                    i++;
-                    if (i > args.Length)
-                    {
-                        WriteError($"Expected socket after \"--host\"");
-                        return;
-                    }
-
-                    if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
-                    {
-                        WriteError(error);
-                        return;
-                    }
-
-                    _connection.StartHost(endPoint);
-                    continue;
-                }
-
-                if (args[i] == "--client")
-                {
-                    i++;
-                    if (i > args.Length)
-                    {
-                        WriteError($"Expected socket after \"--client\"");
-                        return;
-                    }
-
-                    if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
-                    {
-                        WriteError(error);
-                        return;
-                    }
-
-                    _connection.StartClient(endPoint);
-                    continue;
-                }
-            }
-        }
-
         bool wasResized = false;
 
-        Console.WindowWidth = 80;
-        Console.BufferWidth = 80;
-        Console.WindowHeight = 30;
-        Console.BufferHeight = 30;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            if (false)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (args[i] == "--username")
+                    {
+                        i++;
+                        if (i > args.Length)
+                        {
+                            WriteError($"Expected text after \"--username\"");
+                            return;
+                        }
 
-        ConsoleListener.KeyEvent += Keyboard.Feed;
-        ConsoleListener.MouseEvent += Mouse.Feed;
-        ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
+                        _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
+                        continue;
+                    }
 
-        ConsoleListener.Start();
-        ConsoleHandler.Setup();
+                    if (args[i] == "--host")
+                    {
+                        i++;
+                        if (i > args.Length)
+                        {
+                            WriteError($"Expected socket after \"--host\"");
+                            return;
+                        }
+
+                        if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                        {
+                            WriteError(error);
+                            return;
+                        }
+
+                        _connection.StartHost(endPoint);
+                        continue;
+                    }
+
+                    if (args[i] == "--client")
+                    {
+                        i++;
+                        if (i > args.Length)
+                        {
+                            WriteError($"Expected socket after \"--client\"");
+                            return;
+                        }
+
+                        if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                        {
+                            WriteError(error);
+                            return;
+                        }
+
+                        _connection.StartClient(endPoint);
+                        continue;
+                    }
+                }
+            }
+
+            Console.WindowWidth = 80;
+            Console.BufferWidth = 80;
+            Console.WindowHeight = 30;
+            Console.BufferHeight = 30;
+
+            ConsoleListener.KeyEvent += Keyboard.Feed;
+            ConsoleListener.MouseEvent += Mouse.Feed;
+            ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
+
+            ConsoleListener.Start();
+            ConsoleHandler.Setup();
+        }
 
         while (true)
         {
@@ -239,11 +243,15 @@ public class Game
         }
 
         _connection.Close();
-        ConsoleListener.Stop();
-        ConsoleHandler.Restore();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            ConsoleListener.Stop();
+            ConsoleHandler.Restore();
+        }
     }
 
-    void Tick()
+    public void Tick()
     {
         _connection.Tick();
 

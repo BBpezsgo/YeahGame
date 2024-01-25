@@ -4,11 +4,8 @@ namespace YeahGame.Messages;
 
 public enum NetControlMessageKind : byte
 {
-    IM_THERE,
     PING,
     PONG,
-    ARE_U_SERVER,
-    YES_IM_SERVER,
 }
 
 public class NetControlMessage : ReliableMessage

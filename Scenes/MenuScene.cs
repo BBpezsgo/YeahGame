@@ -104,8 +104,8 @@ public class MenuScene : Scene
                     }
                     catch (SocketException socketException)
                     { InputSocketError = socketException.SocketErrorCode.ToString(); }
-                    catch (Exception)
-                    { InputSocketError = "Internal Exception"; }
+                    catch (Exception exception)
+                    { InputSocketError = exception.Message; }
                 }
                 else
                 { InputSocketError = error; }
@@ -128,8 +128,8 @@ public class MenuScene : Scene
                     }
                     catch (SocketException socketException)
                     { InputSocketError = socketException.SocketErrorCode.ToString(); }
-                    catch (Exception)
-                    { InputSocketError = "Internal Exception"; }
+                    catch (Exception exception)
+                    { InputSocketError = exception.Message; }
                 }
                 else
                 { InputSocketError = error; }

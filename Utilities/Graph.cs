@@ -39,7 +39,7 @@ struct Graph
         _min = _currMin;
     }
 
-    public readonly void Render(SmallRect rect, ConsoleRenderer renderer, bool labels, byte color = CharColor.White)
+    public readonly void Render(SmallRect rect, IRenderer<ConsoleChar> renderer, bool labels, byte color = CharColor.White)
     {
         int max = Math.Max(rect.Height - 1, _max);
 

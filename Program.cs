@@ -1,7 +1,10 @@
-﻿namespace YeahGame;
+﻿using System.Runtime.Versioning;
+
+namespace YeahGame;
 
 public class Program
 {
+    [SupportedOSPlatform("windows")]
     static void Main(string[] args)
     {
         // const int WindowWidth = 640;
@@ -33,10 +36,10 @@ public class Program
         // 
         //     renderer.Render();
         // 
-        //     Console.WriteLine($"{(int)(1f / Time.Delta)}");
+        //     Debug.WriteLine($"{(int)(1f / Time.Delta)}");
         // }
 
-        Game game = new();
+        Game game = new(new ConsoleRenderer(), new Connection<PlayerInfo>());
         game.Start(args);
     }
 }
