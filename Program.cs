@@ -39,7 +39,34 @@ public class Program
         //     Debug.WriteLine($"{(int)(1f / Time.Delta)}");
         // }
 
-        Game game = new(new ConsoleRenderer(), new Connection<PlayerInfo>());
+        ConnectionBase<PlayerInfo> connection;
+
+        Console.WriteLine("What kind of connection to use? (udp/ws)");
+        while (true)
+        {
+            Console.Write(" > ");
+            string? input = Console.ReadLine();
+
+            if (string.Equals(input, "udp"))
+            {
+                connection = new UdpConnection<PlayerInfo>();
+                Console.Clear();
+                break;
+            }
+
+            if (string.Equals(input, "ws"))
+            {
+                connection = new WebSocketConnection<PlayerInfo>();
+                Console.Clear();
+                break;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Invalid input \"{input}\"");
+            Console.ResetColor();
+        }
+
+        Game game = new(new ConsoleRenderer(), connection);
         game.Start(args);
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using Win32.Common;
 
 namespace YeahGame;
@@ -111,28 +112,38 @@ public class MenuScene : Scene
                 { InputSocketError = error; }
             }
 
-            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                InputSocketError = null;
-                Game.Connection.LocalUserInfo = new PlayerInfo()
+                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
                 {
-                    Username = InputName.Value.ToString(),
-                };
-
-                if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
-                {
-                    try
+                    InputSocketError = null;
+                    Game.Connection.LocalUserInfo = new PlayerInfo()
                     {
-                        Game.Connection.StartHost(endPoint);
-                        Biscuit.Socket = InputSocket.Value.ToString();
+                        Username = InputName.Value.ToString(),
+                    };
+
+                    if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
+                    {
+                        try
+                        {
+                            Game.Connection.StartHost(endPoint);
+                            Biscuit.Socket = InputSocket.Value.ToString();
+                        }
+                        catch (SocketException socketException)
+                        { InputSocketError = socketException.SocketErrorCode.ToString(); }
+                        catch (Exception exception)
+                        { InputSocketError = exception.Message; }
                     }
-                    catch (SocketException socketException)
-                    { InputSocketError = socketException.SocketErrorCode.ToString(); }
-                    catch (Exception exception)
-                    { InputSocketError = exception.Message; }
+                    else
+                    { InputSocketError = error; }
                 }
-                else
-                { InputSocketError = error; }
+            }
+            else
+            {
+                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
+                {
+                    InputSocketError = "Not Supported";
+                }
             }
         }
     }

@@ -8,7 +8,7 @@ using RawMessage = (System.ReadOnlyMemory<byte> Buffer, System.Net.IPEndPoint So
 
 namespace YeahGame;
 
-public class Connection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> : ConnectionBase<TUserInfo, object?> where TUserInfo : ISerializable
+public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> : ConnectionBase<TUserInfo, object?> where TUserInfo : ISerializable
 {
     #region Public Properties
 

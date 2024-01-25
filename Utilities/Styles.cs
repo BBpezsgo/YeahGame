@@ -9,6 +9,13 @@ public static class Styles
         Down = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
     };
 
+    public static readonly ConsoleButtonStyle DisabledButtonStyle = new()
+    {
+        Normal = CharColor.Make(CharColor.Black, CharColor.Gray),
+        Hover = CharColor.Make(CharColor.Black, CharColor.Gray),
+        Down = CharColor.Make(CharColor.Black, CharColor.Gray),
+    };
+
     public static readonly ConsoleInputFieldStyle InputFieldStyle = new()
     {
         Normal = CharColor.Make(CharColor.Black, CharColor.Silver),
