@@ -92,11 +92,13 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
     {
         Close();
 
-        Debug.WriteLine($"[Net]: Connecting to {$"ws://{endPoint}/"} ...");
+        string url = $"ws://{endPoint}/";
+
+        Debug.WriteLine($"[Net]: Connecting to {url} ...");
 
         _serverEndPoint = endPoint;
         webSocketClient = new ClientWebSocket();
-        webSocketClient.ConnectAsync(new Uri($"ws://{endPoint}/", UriKind.Absolute), CancellationToken.None);
+        webSocketClient.ConnectAsync(new Uri(url, UriKind.Absolute), CancellationToken.None);
 
         OnConnectedToServer_Invoke(ConnectingPhase.Connected);
 
@@ -253,6 +255,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
             if (webSocketClient.CloseStatus.HasValue)
             {
                 Debug.WriteLine($"[WS]: Closed: {webSocketClient.CloseStatus} \"{webSocketClient.CloseStatusDescription}\"");
+                Game.Singleton.MenuScene.ExitReason = $"Closed ({webSocketClient.CloseStatus}) {webSocketClient.CloseStatusDescription}".TrimEnd();
                 Close();
             }
         }
@@ -297,6 +300,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                 break;
             case WebSocketMessageType.Close:
                 Close();
+                Game.Singleton.MenuScene.ExitReason = $"Disconnected ({result.CloseStatus}) {result.CloseStatusDescription}".TrimEnd();
                 break;
             default:
                 break;
