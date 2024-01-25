@@ -24,7 +24,7 @@ public class Player : NetworkEntity
 
     public override void Update()
     {
-        if (Game.IsServer && Owner is not null)
+        if ((Game.IsServer || Game.IsOffline) && Owner is not null)
         {
             IReadOnlyList<Item?> items = Game.Singleton.GameScene.Items;
             for (int i = 0; i < items.Count; i++)
@@ -87,7 +87,7 @@ public class Player : NetworkEntity
                 })
             });
 
-            if (Game.IsServer)
+            if (Game.IsServer || Game.IsOffline)
             {
                 velocity *= Projectile.Speed;
                 velocity *= new Vector2(1, 0.5f);
@@ -108,17 +108,20 @@ public class Player : NetworkEntity
 
     public void Damage(float amount)
     {
-        if (!Game.IsServer) return;
+        if (!Game.IsServer && !Game.IsOffline) return;
 
-        Game.Connection.Send(new RPCMessage()
+        if (Game.IsServer)
         {
-            ObjectId = NetworkId,
-            RPCId = 2,
-            Details = Utils.Serialize(writer =>
+            Game.Connection.Send(new RPCMessage()
             {
-                writer.Write(amount);
-            }),
-        });
+                ObjectId = NetworkId,
+                RPCId = 2,
+                Details = Utils.Serialize(writer =>
+                {
+                    writer.Write(amount);
+                }),
+            });
+        }
 
         HP -= amount;
         if (HP <= 0)
@@ -158,7 +161,7 @@ public class Player : NetworkEntity
         using BinaryReader reader = new(stream);
         Position = reader.ReadVector2();
 
-        if (Game.Connection.IsServer)
+        if (Game.IsServer)
         { Game.Connection.SendExpect(message, source); }
     }
 
@@ -187,7 +190,7 @@ public class Player : NetworkEntity
             Damage(reader.ReadSingle());
         }
 
-        if (Game.Connection.IsServer)
+        if (Game.IsServer)
         { Game.Connection.Send(message); }
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Win32.LowLevel;
 
 namespace YeahGame;
@@ -54,7 +55,11 @@ public class Game
     public static IRenderer<ConsoleChar> Renderer => singleton!.renderer;
     public static bool IsServer => singleton!._connection.IsServer;
     public static ConnectionBase<PlayerInfo> Connection => singleton!._connection;
-
+    public static bool IsOffline
+    {
+        get => singleton!._isOffline;
+        set => singleton!._isOffline = value;
+    }
     #endregion
 
     #region Fields
@@ -64,6 +69,7 @@ public class Game
     readonly IRenderer<ConsoleChar> renderer;
 
     readonly ConnectionBase<PlayerInfo> _connection;
+    bool _isOffline;
 
     readonly ConsoleDropdown _fpsDropdown = new();
     readonly ConsoleDropdown _sentBytesDropdown = new();
@@ -139,9 +145,16 @@ public class Game
     {
         static void WriteError(string error)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(error);
-            Console.ResetColor();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(error);
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.WriteLine(error);
+            }
         }
 
         bool wasResized = false;
@@ -255,7 +268,7 @@ public class Game
     {
         _connection.Tick();
 
-        if (!_connection.IsConnected)
+        if (!_connection.IsConnected && !_isOffline)
         { LoadScene("Menu"); }
         else
         { LoadScene("Game"); }

@@ -2,12 +2,14 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Versioning;
 using YeahGame.Messages;
 
 using RawMessage = (System.ReadOnlyMemory<byte> Buffer, System.Net.IPEndPoint Source);
 
 namespace YeahGame;
 
+[UnsupportedOSPlatform("browser")]
 public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> : ConnectionBase<TUserInfo, object?> where TUserInfo : ISerializable
 {
     #region Public Properties
@@ -29,6 +31,8 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
     {
         get
         {
+            if (Game.IsOffline) return base.LocalEndPoint;
+
             if (_client is null) return null;
 
             if (_isServer)

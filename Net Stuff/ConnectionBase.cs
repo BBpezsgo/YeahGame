@@ -106,7 +106,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
     public abstract IPEndPoint? RemoteEndPoint { get; }
 
-    public abstract IPEndPoint? LocalEndPoint { get; }
+    public virtual IPEndPoint? LocalEndPoint => Game.IsOffline ? new IPEndPoint(IPAddress.Any, 0) : null;
 
     public abstract bool IsServer { get; }
 

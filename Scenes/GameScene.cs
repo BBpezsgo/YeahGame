@@ -58,7 +58,7 @@ public class GameScene : Scene
     {
         base.Load();
 
-        if (Game.IsServer)
+        if (Game.IsServer || Game.IsOffline)
         {
             SpawnEntity(new Player()
             {
@@ -657,7 +657,7 @@ public class GameScene : Scene
         => OnItemPickedUp(item, IPEndPoint.Parse(owner));
     public bool OnItemPickedUp(Item item, IPEndPoint owner)
     {
-        if (!Game.IsServer) return false;
+        if (!Game.IsServer && !Game.IsOffline) return false;
 
         if (Game.Connection.TryGetUserInfo(owner, out ConnectionUserInfo<PlayerInfo> userInfo) &&
             userInfo.Info is not null)
@@ -665,12 +665,15 @@ public class GameScene : Scene
             userInfo.Info.Items.Value.Add(item.Type);
             userInfo.Info.Items.WasChanged = true;
 
-            Game.Connection.Send(new InfoResponseMessage()
+            if (Game.IsServer)
             {
-                IsServer = owner.Equals(Game.Connection.LocalEndPoint),
-                Source = owner,
-                Details = Utils.Serialize(userInfo.Info),
-            });
+                Game.Connection.Send(new InfoResponseMessage()
+                {
+                    IsServer = owner.Equals(Game.Connection.LocalEndPoint),
+                    Source = owner,
+                    Details = Utils.Serialize(userInfo.Info),
+                });
+            }
             return true;
         }
 

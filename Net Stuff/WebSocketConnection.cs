@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.WebSockets;
+using System.Runtime.Versioning;
 using System.Text;
 using YeahGame.Messages;
 
@@ -28,9 +29,18 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
     public override IPEndPoint? RemoteEndPoint => _serverEndPoint;
 
-    public override IPEndPoint? LocalEndPoint => IsServer ? IPEndPoint.Parse(new Uri(httpListener.Prefixes.ElementAt(0)).Host) : _thisIsMe;
+    public override IPEndPoint? LocalEndPoint
+    {
+        get
+        {
+            if (Game.IsOffline) return base.LocalEndPoint;
+            if (IsServer) return (IPEndPoint?)IPEndPoint.Parse(new Uri(httpListener.Prefixes.ElementAt(0)).Host);
+            return _thisIsMe;
+        }
+    }
 
     [MemberNotNullWhen(true, nameof(httpListener))]
+    [UnsupportedOSPlatformGuard("browser")]
     public override bool IsServer => httpListener is not null;
 
     public override ConnectionState State
@@ -52,7 +62,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                 };
             }
 
-            if (httpListener is not null &&
+            if (IsServer &&
                 httpListener.IsListening)
             { return ConnectionState.Hosting; }
 
@@ -75,6 +85,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
     Task<WebSocketReceiveResult>? _webSocketClientReceiveTask;
     readonly byte[] _webSocketClientIncomingBuffer = new byte[128];
 
+    [UnsupportedOSPlatform("browser")]
     public override void StartHost(IPEndPoint endPoint)
     {
         Close();
@@ -111,6 +122,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         Send(new HandshakeRequestMessage());
     }
 
+    [UnsupportedOSPlatform("browser")]
     void WsClientJob(object? parameter)
     {
         if (parameter is not WebSocketRequest wsRequest) return;
@@ -182,8 +194,11 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         webSocketClient?.Dispose();
         webSocketClient = null;
 
-        httpListener?.Stop();
-        httpListener?.Close();
+        if (IsServer)
+        {
+            httpListener?.Stop();
+            httpListener?.Close();
+        }
         httpListener = null;
 
         _serverEndPoint = null;
@@ -201,21 +216,24 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
     public override void Tick()
     {
-        for (int i = incomingWebSockets.Count - 1; i >= 0; i--)
+        if (!OperatingSystem.IsBrowser())
         {
-            WebSocketRequest wsRequest = incomingWebSockets[i];
-            if (wsRequest.Task.IsCompleted)
+            for (int i = incomingWebSockets.Count - 1; i >= 0; i--)
             {
-                incomingWebSockets.RemoveAt(i);
-                if (wsRequest.Task.IsCompletedSuccessfully)
+                WebSocketRequest wsRequest = incomingWebSockets[i];
+                if (wsRequest.Task.IsCompleted)
                 {
-                    OnClientConnected_Invoke(wsRequest.RemoteEndPoint, ConnectingPhase.Connected);
-                    new Thread(WsClientJob).Start(wsRequest);
+                    incomingWebSockets.RemoveAt(i);
+                    if (wsRequest.Task.IsCompletedSuccessfully)
+                    {
+                        OnClientConnected_Invoke(wsRequest.RemoteEndPoint, ConnectingPhase.Connected);
+                        new Thread(WsClientJob).Start(wsRequest);
+                    }
                 }
             }
         }
 
-        if (httpListener is not null &&
+        if (IsServer &&
             httpListener.IsListening)
         {
             if (httpListenerThreadGetContextTask is null ||

@@ -88,6 +88,17 @@ public class MenuScene : Scene
 
             y++;
 
+            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Offline", Styles.ButtonStyle))
+            {
+                InputSocketError = null;
+                Game.Connection.LocalUserInfo = new PlayerInfo()
+                {
+                    Username = InputName.Value.ToString(),
+                };
+
+                Game.IsOffline = true;
+            }
+
             if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.ButtonStyle))
             {
                 InputSocketError = null;
@@ -95,6 +106,8 @@ public class MenuScene : Scene
                 {
                     Username = InputName.Value.ToString(),
                 };
+
+                Game.IsOffline = false;
 
                 if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                 {
@@ -121,6 +134,8 @@ public class MenuScene : Scene
                     {
                         Username = InputName.Value.ToString(),
                     };
+
+                    Game.IsOffline = false;
 
                     if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                     {
@@ -191,13 +206,21 @@ public class MenuScene : Scene
 
         if (!IPAddress.TryParse(left, out IPAddress? address))
         {
-            IPHostEntry entry = Dns.GetHostEntry(left.ToString(), AddressFamily.InterNetwork);
-            if (entry.AddressList.Length == 0)
+            if (OperatingSystem.IsBrowser())
             {
-                error = "Hostname not found";
+                error = "Sadly you cannot do DNS lookup in the browser";
                 return false;
             }
-            address = entry.AddressList[0];
+            else
+            {
+                IPHostEntry entry = Dns.GetHostEntry(left.ToString(), AddressFamily.InterNetwork);
+                if (entry.AddressList.Length == 0)
+                {
+                    error = "Hostname not found";
+                    return false;
+                }
+                address = entry.AddressList[0];
+            }
         }
 
         endPoint = new IPEndPoint(address, port);
