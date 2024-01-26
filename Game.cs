@@ -122,6 +122,8 @@ public class Game
         _connection.OnClientDisconnected += GameScene.OnClientDisconnected;
         _connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
         Scenes.Add(GameScene);
+
+        _debugPanel.Rect.X = (short)(_renderer.Width - _debugPanel.Rect.Width);
     }
 
     public void LoadScene(string name)
@@ -244,6 +246,7 @@ public class Game
             {
                 renderer.RefreshBufferSize();
                 wasResized = false;
+                _debugPanel.ClampPosition(renderer.Size);
             }
             else
             {
