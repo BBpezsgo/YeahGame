@@ -15,7 +15,10 @@ public class MenuScene : Scene
 
     readonly ConsoleInputField InputName = new(Biscuit.Username);
 
-    readonly ConsoleSelectBox<string> SelectBox = new("Item 1", "Item 2", "Item 3");
+    const string ConnectionType_UDP = "UDP";
+    const string ConnectionType_WebSocket = "WebSocket";
+
+    readonly ConsoleSelectBox<string> ConnectionType = new(ConnectionType_UDP, ConnectionType_WebSocket);
 
     public string? ExitReason;
 
@@ -49,7 +52,8 @@ public class MenuScene : Scene
                 ExitReason = null;
             }
         }
-        else if (Game.Connection.State != ConnectionState.None)
+        else if (Game.HasConnection &&
+                 Game.Connection.State != ConnectionState.None)
         {
             string text = Game.Connection.State switch
             {
@@ -68,7 +72,7 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 13), new SmallRect(default, Game.Renderer.Size));
+            SmallRect box = Layout.Center(new SmallSize(30, 14), new SmallRect(default, Game.Renderer.Size));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1, 2);
@@ -92,15 +96,29 @@ public class MenuScene : Scene
 
             y++;
 
-            Game.Renderer.SelectBox(
+            Game.Renderer.Text(box.Left, box.Top + y++, "Connection Type:");
+
+            if (Game.Renderer.SelectBox(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
-                SelectBox);
+                ConnectionType))
+            {
+                Game.Connection = ConnectionType.SelectedItem switch
+                {
+                    ConnectionType_UDP => new UdpConnection<PlayerInfo>(),
+                    ConnectionType_WebSocket => new WebSocketConnection<PlayerInfo>(),
+                    _ => null!,
+                };
+                Game.Singleton.SetupConnectionListeners(Game.Connection);
+            }
 
             y++;
 
             if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Offline", Styles.ButtonStyle))
             {
                 InputSocketError = null;
+
+                Game.Connection ??= new UdpConnection<PlayerInfo>();
+                Game.Singleton.SetupConnectionListeners(Game.Connection);
                 Game.Connection.LocalUserInfo = new PlayerInfo()
                 {
                     Username = InputName.Value.ToString(),
@@ -111,7 +129,14 @@ public class MenuScene : Scene
                 Game.IsOffline = true;
             }
 
-            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.ButtonStyle))
+            if (!Game.HasConnection)
+            {
+                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.DisabledButtonStyle))
+                {
+                    InputSocketError = "Select a connection type";
+                }
+            }
+            else if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.ButtonStyle))
             {
                 InputSocketError = null;
                 Game.Connection.LocalUserInfo = new PlayerInfo()
@@ -139,9 +164,23 @@ public class MenuScene : Scene
                 { InputSocketError = error; }
             }
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsBrowser())
             {
-                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
+                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
+                {
+                    InputSocketError = "Not Supported";
+                }
+            }
+            else
+            {
+                if (!Game.HasConnection)
+                {
+                    if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
+                    {
+                        InputSocketError = "Select a connection type";
+                    }
+                }
+                else if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
                 {
                     InputSocketError = null;
                     Game.Connection.LocalUserInfo = new PlayerInfo()
@@ -169,13 +208,6 @@ public class MenuScene : Scene
                     { InputSocketError = error; }
                 }
             }
-            else
-            {
-                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
-                {
-                    InputSocketError = "Not Supported";
-                }
-            }
         }
     }
 
@@ -186,11 +218,14 @@ public class MenuScene : Scene
         {
             string defaultUsername = Biscuit.Username ?? "SERVER";
             string defaultSocket = Biscuit.Socket ?? "127.0.0.1";
+            string defaultConnectionType = "udp";
 
             Console.WriteLine($"Enter a username (default is \"{defaultUsername}\"):");
             Console.Write(" > ");
             string? username = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(username)) username = defaultUsername;
+
+            Console.WriteLine($"Username is \"{username}\"");
 
             IPEndPoint? socket;
             Console.WriteLine($"Enter a socket (default is \"{defaultSocket}\"):");
@@ -206,6 +241,42 @@ public class MenuScene : Scene
                 Console.WriteLine($"Failed to parse socket \"{_socket}\":");
                 Console.WriteLine(error);
             }
+
+            Console.WriteLine($"Socket is \"{socket}\"");
+
+            ConnectionBase<PlayerInfo> connection;
+            Console.WriteLine($"Enter a connection type (default is \"{defaultConnectionType}\"):");
+            while (true)
+            {
+                Console.Write(" > ");
+                string? _connectionType = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(_connectionType)) _connectionType = defaultConnectionType;
+
+                _connectionType = _connectionType.Trim().ToLowerInvariant();
+
+                if (_connectionType == "udp" ||
+                    _connectionType == "u")
+                {
+                    connection = new UdpConnection<PlayerInfo>();
+                    Console.WriteLine($"Connection type is UDP");
+                    break;
+                }
+                
+                if (_connectionType == "ws" ||
+                    _connectionType == "websocket" ||
+                    _connectionType == "web" ||
+                    _connectionType == "w")
+                {
+                    connection = new WebSocketConnection<PlayerInfo>();
+                    Console.WriteLine($"Connection type is WebSocket");
+                    break;
+                }
+
+                Console.WriteLine($"Invalid connection type \"{_connectionType}\"");
+            }
+
+            Game.Connection = connection;
+            Game.Singleton.SetupConnectionListeners(connection);
 
             try
             {

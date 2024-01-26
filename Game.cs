@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Win32.LowLevel;
@@ -55,14 +56,21 @@ public class Game
     public static IRenderer<ConsoleChar> Renderer
     {
 #if SERVER
-        [DoesNotReturn]
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
         get => throw new PlatformNotSupportedException();
 #else
         get => singleton!.renderer;
 #endif
     }
-    public static bool IsServer => singleton!._connection.IsServer;
-    public static ConnectionBase<PlayerInfo> Connection => singleton!._connection;
+    public static bool IsServer => singleton!._connection?.IsServer ?? false;
+    [MemberNotNullWhen(true, nameof(_connection))]
+    [MemberNotNullWhen(true, nameof(Connection))]
+    public static bool HasConnection => singleton!._connection is not null;
+    public static ConnectionBase<PlayerInfo> Connection
+    {
+        get => singleton!._connection ?? throw new NullReferenceException($"{nameof(_connection)} is null");
+        set => singleton!._connection = value;
+    }
     public static bool IsOffline
     {
         get => singleton!._isOffline;
@@ -78,7 +86,7 @@ public class Game
     readonly IRenderer<ConsoleChar> renderer;
 #endif
 
-    readonly ConnectionBase<PlayerInfo> _connection;
+    ConnectionBase<PlayerInfo>? _connection;
     bool _isOffline;
 
 #if !SERVER
@@ -120,9 +128,9 @@ public class Game
 
     public Game(
 #if !SERVER
-        IRenderer<ConsoleChar> _renderer,
+        IRenderer<ConsoleChar> _renderer
 #endif
-        ConnectionBase<PlayerInfo> connection)
+        )
     {
         singleton = this;
 
@@ -130,22 +138,24 @@ public class Game
         renderer = _renderer;
 #endif
 
-        _connection = connection;
-
         MenuScene = new MenuScene();
         Scenes.Add(MenuScene);
 
         GameScene = new GameScene();
-        _connection.OnMessageReceived += GameScene.OnMessageReceived;
-        _connection.OnClientConnected += GameScene.OnClientConnected;
-        _connection.OnClientDisconnected += GameScene.OnClientDisconnected;
-        _connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
         Scenes.Add(GameScene);
 
 #if !SERVER
         _currentFps.Reset();
         _debugPanel.Rect.X = (short)(_renderer.Width - _debugPanel.Rect.Width);
 #endif
+    }
+
+    public void SetupConnectionListeners<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo>(ConnectionBase<TUserInfo> connection) where TUserInfo : ISerializable
+    {
+        connection.OnMessageReceived += GameScene.OnMessageReceived;
+        connection.OnClientConnected += GameScene.OnClientConnected;
+        connection.OnClientDisconnected += GameScene.OnClientDisconnected;
+        connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
     }
 
     public static void Stop()
@@ -235,7 +245,7 @@ public class Game
 #endif
         }
 
-        _connection.Close();
+        _connection?.Close();
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -257,6 +267,7 @@ public class Game
                     return;
                 }
 
+                _connection ??= new UdpConnection<PlayerInfo>();
                 _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
                 continue;
             }
@@ -276,6 +287,7 @@ public class Game
                     return;
                 }
 
+                _connection ??= new UdpConnection<PlayerInfo>();
                 _connection.StartHost(endPoint);
                 continue;
             }
@@ -295,6 +307,7 @@ public class Game
                     return;
                 }
 
+                _connection ??= new UdpConnection<PlayerInfo>();
                 _connection.StartClient(endPoint);
                 continue;
             }
@@ -303,9 +316,9 @@ public class Game
 
     public void Tick()
     {
-        _connection.Tick();
+        _connection?.Tick();
 
-        if (!_connection.IsConnected && !_isOffline)
+        if (_connection is null || !_connection.IsConnected && !_isOffline)
         { LoadScene("Menu"); }
         else
         { LoadScene("Game"); }
@@ -357,7 +370,7 @@ public class Game
                 _currentFps.Set((int)Time.FPS);
             }
 
-            if (Time.Now - _lastConnectionCounterReset >= 1f)
+            if (_connection is not null && Time.Now - _lastConnectionCounterReset >= 1f)
             {
                 _lastConnectionCounterReset = Time.Now;
                 _sentBytesPerSec = _connection.SentBytes;
@@ -384,7 +397,7 @@ public class Game
 
             int y = rect.Y + 1;
 
-            renderer.Dropdown(rect.X + 1, y, _fpsDropdown, $"FPS: {(int)(_currentFps.Min)}", Styles.DropdownStyle);
+            renderer.Dropdown(rect.X + 1, y, _fpsDropdown, $"FPS: {_currentFps.Min}", Styles.DropdownStyle);
             y++;
             if (_fpsDropdown)
             {
@@ -393,25 +406,28 @@ public class Game
                 _fps.Render(graphRect, renderer, true);
             }
 
-            renderer.Text(rect.X + 1, y++, $"State: {_connection.State}");
-            renderer.Text(rect.X + 1, y++, $"Lost Packets: {_connection.LostPackets}");
-
-            renderer.Dropdown(rect.X + 1, y, _sentBytesDropdown, $"Sent: {_sentBytesPerSec} bytes/sec", Styles.DropdownStyle);
-            y++;
-            if (_sentBytesDropdown)
+            if (_connection is not null)
             {
-                SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-                y += graphRect.Height;
-                _sentBytes.Render(graphRect, renderer, false);
-            }
+                renderer.Text(rect.X + 1, y++, $"State: {_connection.State}");
+                renderer.Text(rect.X + 1, y++, $"Lost Packets: {_connection.LostPackets}");
 
-            renderer.Dropdown(rect.X + 1, y, _receivedBytesDropdown, $"Received: {_receivedBytesPerSec} bytes/sec ({(_packetLoss * 100):0}%)", Styles.DropdownStyle);
-            y++;
-            if (_receivedBytesDropdown)
-            {
-                SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-                y += graphRect.Height;
-                _receivedBytes.Render(graphRect, renderer, false);
+                renderer.Dropdown(rect.X + 1, y, _sentBytesDropdown, $"Sent: {_sentBytesPerSec} bytes/sec", Styles.DropdownStyle);
+                y++;
+                if (_sentBytesDropdown)
+                {
+                    SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
+                    y += graphRect.Height;
+                    _sentBytes.Render(graphRect, renderer, false);
+                }
+
+                renderer.Dropdown(rect.X + 1, y, _receivedBytesDropdown, $"Received: {_receivedBytesPerSec} bytes/sec ({(_packetLoss * 100):0}%)", Styles.DropdownStyle);
+                y++;
+                if (_receivedBytesDropdown)
+                {
+                    SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
+                    y += graphRect.Height;
+                    _receivedBytes.Render(graphRect, renderer, false);
+                }
             }
 
             // if (Utils.IsDebug)

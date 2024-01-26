@@ -39,9 +39,10 @@ public class Program
         // }
 
 #if SERVER
-        Trace.Listeners.Add(new ConsoleTraceListener(false));
+        System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.ConsoleTraceListener(false));
 #endif
 
+        /*
         ConnectionBase<PlayerInfo> connection;
 
         Console.WriteLine("What kind of connection to use? (udp/ws)");
@@ -66,12 +67,13 @@ public class Program
             Console.WriteLine($"Invalid input \"{input}\"");
             Console.ResetColor();
         }
+        */
 
         Game game = new(
 #if !SERVER
-            OperatingSystem.IsWindows() ? new ConsoleRenderer() : null!,
+            OperatingSystem.IsWindows() ? new ConsoleRenderer() : null!
 #endif
-            connection);
+            );
         game.Start(args);
     }
 }
