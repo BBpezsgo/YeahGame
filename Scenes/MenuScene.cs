@@ -12,7 +12,10 @@ public class MenuScene : Scene
 
     readonly ConsoleInputField InputSocket = new(Biscuit.Socket);
     string? InputSocketError = null;
+
     readonly ConsoleInputField InputName = new("Bruh");
+
+    readonly ConsoleSelectBox<string> SelectBox = new("Item 1", "Item 2", "Item 3");
 
     public string? ExitReason;
 
@@ -64,7 +67,7 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 11), new SmallRect(default, Game.Renderer.Size));
+            SmallRect box = Layout.Center(new SmallSize(30, 13), new SmallRect(default, Game.Renderer.Size));
 
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1, 2);
@@ -85,6 +88,12 @@ public class MenuScene : Scene
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
                 Styles.InputFieldStyle,
                 InputName);
+
+            y++;
+
+            Game.Renderer.SelectBox(
+                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                SelectBox);
 
             y++;
 
