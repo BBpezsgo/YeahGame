@@ -90,9 +90,13 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
     {
         Close();
 
+        string url = $"http://{endPoint}/";
+
         httpListener = new HttpListener();
-        httpListener.Prefixes.Add($"http://{endPoint}/");
+        httpListener.Prefixes.Add(url);
         httpListener.Start();
+
+        Debug.WriteLine($"[Net:] Listening on {url} ...");
 
         _lostPackets = 0;
         _receivedAt = Time.NowNoCache;

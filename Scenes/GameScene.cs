@@ -220,6 +220,15 @@ public class GameScene : Scene
             }
         }
 
+        if (Game.Connection.IsConnected &&
+            Keyboard.IsKeyDown(Win32.LowLevel.VirtualKeyCode.END))
+        {
+            Game.Connection.Send(new BruhMessage()
+            {
+                ShouldAck = true,
+            });
+        }
+
         if (Game.IsServer)
         {
             foreach (IPEndPoint client in Game.Connection.Connections)

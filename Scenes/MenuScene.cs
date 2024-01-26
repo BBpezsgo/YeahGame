@@ -13,7 +13,7 @@ public class MenuScene : Scene
     readonly ConsoleInputField InputSocket = new(Biscuit.Socket);
     string? InputSocketError = null;
 
-    readonly ConsoleInputField InputName = new("Bruh");
+    readonly ConsoleInputField InputName = new(Biscuit.Username);
 
     readonly ConsoleSelectBox<string> SelectBox = new("Item 1", "Item 2", "Item 3");
 
@@ -23,6 +23,7 @@ public class MenuScene : Scene
     {
         base.Load();
         InputSocket.Value = new System.Text.StringBuilder(Biscuit.Socket);
+        InputName.Value = new System.Text.StringBuilder(Biscuit.Username);
     }
 
     public override void Unload()
@@ -105,6 +106,8 @@ public class MenuScene : Scene
                     Username = InputName.Value.ToString(),
                 };
 
+                Biscuit.Username = InputName.Value.ToString();
+
                 Game.IsOffline = true;
             }
 
@@ -123,7 +126,9 @@ public class MenuScene : Scene
                     try
                     {
                         Game.Connection.StartClient(endPoint);
+
                         Biscuit.Socket = InputSocket.Value.ToString();
+                        Biscuit.Username = InputName.Value.ToString();
                     }
                     catch (SocketException socketException)
                     { InputSocketError = socketException.SocketErrorCode.ToString(); }
@@ -151,7 +156,9 @@ public class MenuScene : Scene
                         try
                         {
                             Game.Connection.StartHost(endPoint);
+
                             Biscuit.Socket = InputSocket.Value.ToString();
+                            Biscuit.Username = InputName.Value.ToString();
                         }
                         catch (SocketException socketException)
                         { InputSocketError = socketException.SocketErrorCode.ToString(); }
@@ -174,7 +181,45 @@ public class MenuScene : Scene
 
     public override void Tick()
     {
+#if SERVER
+        while (true)
+        {
+            string defaultUsername = Biscuit.Username ?? "SERVER";
+            string defaultSocket = Biscuit.Socket ?? "127.0.0.1";
 
+            Console.WriteLine($"Enter a username (default is \"{defaultUsername}\"):");
+            Console.Write(" > ");
+            string? username = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(username)) username = defaultUsername;
+
+            IPEndPoint? socket;
+            Console.WriteLine($"Enter a socket (default is \"{defaultSocket}\"):");
+            while (true)
+            {
+                Console.Write(" > ");
+                string? _socket = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(_socket)) _socket = defaultSocket;
+
+                if (TryParseSocket(_socket, out socket, out string? error))
+                { break; }
+
+                Console.WriteLine($"Failed to parse socket \"{_socket}\":");
+                Console.WriteLine(error);
+            }
+
+            try
+            {
+                Game.Connection.StartHost(socket);
+
+                Biscuit.Username = username.ToString();
+                Biscuit.Socket = socket.ToString();
+
+                break;
+            }
+            catch (Exception exception)
+            { Console.WriteLine(exception); }
+        }
+#endif
     }
 
     public static bool TryParseSocket(

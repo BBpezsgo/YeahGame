@@ -52,7 +52,15 @@ public class Game
     #region Public Static Stuff
 
     public static Game Singleton => singleton!;
-    public static IRenderer<ConsoleChar> Renderer => singleton!.renderer;
+    public static IRenderer<ConsoleChar> Renderer
+    {
+#if SERVER
+        [DoesNotReturn]
+        get => throw new PlatformNotSupportedException();
+#else
+        get => singleton!.renderer;
+#endif
+    }
     public static bool IsServer => singleton!._connection.IsServer;
     public static ConnectionBase<PlayerInfo> Connection => singleton!._connection;
     public static bool IsOffline
@@ -66,10 +74,14 @@ public class Game
 
     static Game? singleton;
 
+#if !SERVER
     readonly IRenderer<ConsoleChar> renderer;
+#endif
 
     readonly ConnectionBase<PlayerInfo> _connection;
     bool _isOffline;
+
+#if !SERVER
 
     readonly ConsoleDropdown _fpsDropdown = new();
     readonly ConsoleDropdown _sentBytesDropdown = new();
@@ -90,26 +102,33 @@ public class Game
     MinMax<int> _currentFps;
     Graph _fps = new(GraphWidth + 1);
 
-
     // float _lastMemoryCounterReset;
     // long _lastAllocatedMemory;
     // int _allocatePerSec;
     // Graph _memory = new(GraphWidth + 1);
 
+#endif
+
     readonly List<Scene> Scenes = new();
+
+    bool _shouldRun;
 
     #endregion
 
     public readonly MenuScene MenuScene;
     public readonly GameScene GameScene;
 
-    public Game(IRenderer<ConsoleChar> _renderer, ConnectionBase<PlayerInfo> connection)
+    public Game(
+#if !SERVER
+        IRenderer<ConsoleChar> _renderer,
+#endif
+        ConnectionBase<PlayerInfo> connection)
     {
         singleton = this;
 
+#if !SERVER
         renderer = _renderer;
-
-        _currentFps.Reset();
+#endif
 
         _connection = connection;
 
@@ -123,8 +142,14 @@ public class Game
         _connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
         Scenes.Add(GameScene);
 
+#if !SERVER
+        _currentFps.Reset();
         _debugPanel.Rect.X = (short)(_renderer.Width - _debugPanel.Rect.Width);
+#endif
     }
+
+    public static void Stop()
+    { if (singleton is not null) singleton._shouldRun = false; }
 
     public void LoadScene(string name)
     {
@@ -145,97 +170,46 @@ public class Game
 
     public void Start(string[] args)
     {
-        static void WriteError(string error)
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(error);
-                Console.ResetColor();
-            }
-            else
-            {
-                Console.WriteLine(error);
-            }
-        }
-
+#if !SERVER
         bool wasResized = false;
+#endif
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+#if SERVER
+        ProcessArguments(args);
+#else
+        if (true) ProcessArguments(args);
+#endif
+
+#if !SERVER
+        if (!OperatingSystem.IsBrowser())
         {
-            if (false)
-            {
-                for (int i = 0; i < args.Length; i++)
-                {
-                    if (args[i] == "--username")
-                    {
-                        i++;
-                        if (i > args.Length)
-                        {
-                            WriteError($"Expected text after \"--username\"");
-                            return;
-                        }
-
-                        _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
-                        continue;
-                    }
-
-                    if (args[i] == "--host")
-                    {
-                        i++;
-                        if (i > args.Length)
-                        {
-                            WriteError($"Expected socket after \"--host\"");
-                            return;
-                        }
-
-                        if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
-                        {
-                            WriteError(error);
-                            return;
-                        }
-
-                        _connection.StartHost(endPoint);
-                        continue;
-                    }
-
-                    if (args[i] == "--client")
-                    {
-                        i++;
-                        if (i > args.Length)
-                        {
-                            WriteError($"Expected socket after \"--client\"");
-                            return;
-                        }
-
-                        if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
-                        {
-                            WriteError(error);
-                            return;
-                        }
-
-                        _connection.StartClient(endPoint);
-                        continue;
-                    }
-                }
-            }
-
             Console.WindowWidth = 80;
-            Console.BufferWidth = 80;
             Console.WindowHeight = 30;
-            Console.BufferHeight = 30;
+
+            if (OperatingSystem.IsWindows())
+            {
+                Console.BufferWidth = 80;
+                Console.BufferHeight = 30;
+            }
 
             ConsoleListener.KeyEvent += Keyboard.Feed;
             ConsoleListener.MouseEvent += Mouse.Feed;
             ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
 
-            ConsoleListener.Start();
-            ConsoleHandler.Setup();
+            if (OperatingSystem.IsWindows())
+            {
+                ConsoleListener.Start();
+                ConsoleHandler.Setup();
+            }
         }
+#endif
 
-        while (true)
+        _shouldRun = true;
+
+        while (_shouldRun)
         {
             Time.Tick();
+#if !SERVER
             Keyboard.Tick();
             Mouse.Tick();
 
@@ -252,10 +226,13 @@ public class Game
             {
                 renderer.ClearBuffer();
             }
+#endif
 
             Tick();
 
+#if !SERVER
             renderer.Render();
+#endif
         }
 
         _connection.Close();
@@ -264,6 +241,63 @@ public class Game
         {
             ConsoleListener.Stop();
             ConsoleHandler.Restore();
+        }
+    }
+
+    void ProcessArguments(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--username")
+            {
+                i++;
+                if (i > args.Length)
+                {
+                    Console.WriteLine($"Expected text after \"--username\"");
+                    return;
+                }
+
+                _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
+                continue;
+            }
+
+            if (args[i] == "--host")
+            {
+                i++;
+                if (i > args.Length)
+                {
+                    Console.WriteLine($"Expected socket after \"--host\"");
+                    return;
+                }
+
+                if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                {
+                    Console.WriteLine(error);
+                    return;
+                }
+
+                _connection.StartHost(endPoint);
+                continue;
+            }
+
+            if (args[i] == "--client")
+            {
+                i++;
+                if (i > args.Length)
+                {
+                    Console.WriteLine($"Expected socket after \"--client\"");
+                    return;
+                }
+
+                if (!MenuScene.TryParseSocket(args[i], out IPEndPoint? endPoint, out string? error))
+                {
+                    Console.WriteLine(error);
+                    return;
+                }
+
+                _connection.StartClient(endPoint);
+                continue;
+            }
         }
     }
 
@@ -281,10 +315,13 @@ public class Game
             if (Scenes[i].IsLoaded)
             {
                 Scenes[i].Tick();
+#if !SERVER
                 Scenes[i].Render();
+#endif
             }
         }
 
+#if !SERVER
         if (DebugPanel)
         {
             /*
@@ -396,5 +433,6 @@ public class Game
         //     ConsoleChar c = renderer[Mouse.RecordedConsolePosition];
         //     renderer[Mouse.RecordedConsolePosition] = new ConsoleChar(c.Char, CharColor.Invert(c.Foreground), CharColor.Invert(c.Background));
         // }
+#endif
     }
 }

@@ -341,7 +341,8 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         }
 
         if (Time.NowNoCache - _receivedAt >= PingInterval &&
-            Time.NowNoCache - _sentAt >= PingInterval)
+            Time.NowNoCache - _sentAt >= PingInterval &&
+            IsConnected)
         {
             Debug.WriteLine($"[Net]: == {RemoteEndPoint} => Ping (idling more than {PingInterval} seconds)");
             SendImmediate(new NetControlMessage(NetControlMessageKind.PING));
@@ -396,6 +397,18 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         NetControlMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
                         FeedControlMessage(_message, source);
+                        return;
+                    }
+
+                    case MessageType.Bruh:
+                    {
+                        BruhMessage _message = new(reader);
+                        OnReceivingInternal(_message, source);
+
+                        Debug.WriteLine($"[Net]: Client {source} requested to shut down the server :(");
+
+                        Game.Stop();
+
                         return;
                     }
 

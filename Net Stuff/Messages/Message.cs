@@ -12,6 +12,7 @@ public enum MessageType : byte
     HandshakeResponse = 8,
     ReliableMessageReceived = 9,
     ChatMessage = 10,
+    Bruh = 11,
 }
 
 public abstract class Message : ISerializable, ICopyable<Message>

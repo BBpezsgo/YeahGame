@@ -64,8 +64,10 @@ public class Player : NetworkEntity
             }
         }
 
+#if !SERVER
         Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
         Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
+#endif
 
         if (!Mouse.WasUsed &&
             Mouse.IsPressed(MouseButton.Left) &&

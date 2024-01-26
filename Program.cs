@@ -4,7 +4,6 @@ namespace YeahGame;
 
 public class Program
 {
-    [SupportedOSPlatform("windows")]
     static void Main(string[] args)
     {
         // const int WindowWidth = 640;
@@ -39,6 +38,10 @@ public class Program
         //     Debug.WriteLine($"{(int)(1f / Time.Delta)}");
         // }
 
+#if SERVER
+        Trace.Listeners.Add(new ConsoleTraceListener(false));
+#endif
+
         ConnectionBase<PlayerInfo> connection;
 
         Console.WriteLine("What kind of connection to use? (udp/ws)");
@@ -50,14 +53,12 @@ public class Program
             if (string.Equals(input, "udp"))
             {
                 connection = new UdpConnection<PlayerInfo>();
-                Console.Clear();
                 break;
             }
 
             if (string.Equals(input, "ws"))
             {
                 connection = new WebSocketConnection<PlayerInfo>();
-                Console.Clear();
                 break;
             }
 
@@ -66,7 +67,11 @@ public class Program
             Console.ResetColor();
         }
 
-        Game game = new(new ConsoleRenderer(), connection);
+        Game game = new(
+#if !SERVER
+            OperatingSystem.IsWindows() ? new ConsoleRenderer() : null!,
+#endif
+            connection);
         game.Start(args);
     }
 }

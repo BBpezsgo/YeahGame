@@ -8,12 +8,12 @@ public partial class BiscuitContext : JsonSerializerContext { }
 
 public class Biscuit
 {
-    public static string Socket
+    public static string? Socket
     {
         get
         {
             Biscuit.Load();
-            return _singleton._socket ?? throw new NullReferenceException();
+            return _singleton._socket;
         }
         set
         {
@@ -21,12 +21,12 @@ public class Biscuit
             Biscuit.Save();
         }
     }
-    public static string Username
+    public static string? Username
     {
         get
         {
             Biscuit.Load();
-            return _singleton._username ?? throw new NullReferenceException();
+            return _singleton._username;
         }
         set
         {
@@ -43,23 +43,16 @@ public class Biscuit
 
     const string FileName = "biscuit.json";
 
-    static Biscuit _default => new()
-    {
-        _socket = "127.0.0.1:7776",
-        _username = "Bruh",
-    };
-    static Biscuit _singleton = Biscuit._default;
+    static Biscuit _singleton = new();
 
     static void Load()
     {
-        _singleton = Biscuit._default;
-
         if (!File.Exists(FileName))
         { return; }
 
         try
         {
-            _singleton = JsonSerializer.Deserialize<Biscuit>(File.ReadAllText(FileName), BiscuitContext.Default.Biscuit) ?? Biscuit._default;
+            _singleton = JsonSerializer.Deserialize<Biscuit>(File.ReadAllText(FileName), BiscuitContext.Default.Biscuit) ?? new Biscuit();
         }
         catch (JsonException)
         { }
