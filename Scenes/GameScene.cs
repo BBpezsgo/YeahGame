@@ -187,10 +187,10 @@ public class GameScene : Scene
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
 
             ReadOnlySpan<char> text1 = "YOU DIED";
-            Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text1), box.Top + 2, text1, CharColor.BrightRed);
+            Game.Renderer.Text(box.Left + Layout.Center(text1, box.Width - 2), box.Top + 2, text1, CharColor.BrightRed);
 
             ReadOnlySpan<char> text2 = $"Respawn in {Math.Max(0f, RespawnTime - (Time.Now - LocalRespawnTimer)):0.0} sec ...";
-            Game.Renderer.Text(box.Left + Layout.Center(box.Width - 2, text2), box.Top + 4, text2, CharColor.White);
+            Game.Renderer.Text(box.Left + Layout.Center(text2, box.Width - 2), box.Top + 4, text2, CharColor.White);
         }
         else if (Game.Connection.LocalUserInfo is not null)
         {

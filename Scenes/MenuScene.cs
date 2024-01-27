@@ -28,6 +28,8 @@ public class MenuScene : Scene
         },
     };
 
+    readonly ConsoleImage? LogoImage = null; // (ConsoleImage)Png.LoadFile(@"C:\Users\bazsi\Desktop\logo.png", (0, 0, 0));
+
     public string? ExitReason;
 
     public override void Load()
@@ -91,34 +93,51 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallRect box = Layout.Center(new SmallSize(30, 14), new SmallRect(default, Game.Renderer.Size));
+            SmallSize menuSize = new(30, 14);
 
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
-            box = box.Margin(1, 2);
+            SmallRect menuRect = Layout.Center(menuSize, new SmallRect(default, Game.Renderer.Size));
+
+            if (LogoImage != null)
+            {
+                const int LogoMenuSpace = 3;
+
+                Coord logoPos = default;
+
+                logoPos.X = (short)Layout.Center(LogoImage.Value.Width * 2, Game.Renderer.Width);
+                logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - LogoImage.Value.Height);
+
+                Game.Renderer.Image(logoPos, LogoImage.Value, 2, 1);
+                // Game.Renderer.Image(logoPos, LogoImage);
+
+            }
+
+            Game.Renderer.Box(menuRect, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            menuRect = menuRect.Margin(1, 2);
+            menuRect.Right++;
             int y = 1;
 
-            Game.Renderer.Text(box.Left, box.Top + y++, "Socket:");
+            Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, "Socket:");
 
             Game.Renderer.InputField(
-                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1),
                 Styles.InputFieldStyle,
                 InputSocket);
 
-            Game.Renderer.Text(box.Left, box.Top + y++, InputSocketError, CharColor.BrightRed);
+            Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, InputSocketError, CharColor.BrightRed);
 
-            Game.Renderer.Text(box.Left, box.Top + y++, "Username:");
+            Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, "Username:");
 
             Game.Renderer.InputField(
-                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1),
                 Styles.InputFieldStyle,
                 InputName);
 
             y++;
 
-            Game.Renderer.Text(box.Left, box.Top + y++, "Connection Type:");
+            Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, "Connection Type:");
 
             if (Game.Renderer.SelectBox(
-                new SmallRect(box.Left, box.Top + y++, box.Width, 1),
+                new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1),
                 ConnectionType,
                 Styles.SelectBoxStyle))
             {
@@ -133,7 +152,7 @@ public class MenuScene : Scene
 
             y++;
 
-            if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Offline", Styles.ButtonStyle))
+            if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Offline", Styles.ButtonStyle))
             {
                 InputSocketError = null;
 
@@ -152,12 +171,12 @@ public class MenuScene : Scene
 
             if (!Game.HasConnection)
             {
-                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.DisabledButtonStyle))
+                if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Connect", Styles.DisabledButtonStyle))
                 {
                     InputSocketError = "Select a connection type";
                 }
             }
-            else if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Connect", Styles.ButtonStyle))
+            else if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Connect", Styles.ButtonStyle))
             {
                 InputSocketError = null;
                 Game.Connection.LocalUserInfo = new PlayerInfo()
@@ -188,7 +207,7 @@ public class MenuScene : Scene
 
             if (OperatingSystem.IsBrowser())
             {
-                if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
+                if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Host", Styles.DisabledButtonStyle))
                 {
                     InputSocketError = "Not Supported";
                 }
@@ -197,12 +216,12 @@ public class MenuScene : Scene
             {
                 if (!Game.HasConnection)
                 {
-                    if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.DisabledButtonStyle))
+                    if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Host", Styles.DisabledButtonStyle))
                     {
                         InputSocketError = "Select a connection type";
                     }
                 }
-                else if (Game.Renderer.Button(new SmallRect(box.Left, box.Top + y++, box.Width, 1), "Host", Styles.ButtonStyle))
+                else if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Host", Styles.ButtonStyle))
                 {
                     InputSocketError = null;
                     Game.Connection.LocalUserInfo = new PlayerInfo()

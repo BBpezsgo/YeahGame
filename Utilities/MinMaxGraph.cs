@@ -44,7 +44,7 @@ struct MinMaxGraph
 
     public readonly void Render(SmallRect rect, IRenderer<ConsoleChar> renderer, bool labels)
     {
-        int max = Math.Max(rect.Height - 1, _max);
+        int max = Math.Max(rect.Height, _max);
 
         renderer.Box(rect, CharColor.Black, CharColor.Gray, in Ascii.BoxSides);
 

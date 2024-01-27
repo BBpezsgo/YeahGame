@@ -362,6 +362,8 @@ public class Game
         {
             SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
             rect.Bottom += graphRect.Height;
+            rect.Bottom++;
+
             _fps.Render(graphRect, renderer, true);
         }
     }
@@ -396,6 +398,7 @@ public class Game
         {
             SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
             rect.Bottom += graphRect.Height;
+            rect.Bottom++;
 
             _sentBytes.Render(graphRect, renderer, false);
         }
@@ -407,6 +410,7 @@ public class Game
         {
             SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
             rect.Bottom += graphRect.Height;
+            rect.Bottom++;
 
             _receivedBytes.Render(graphRect, renderer, false);
         }
@@ -424,6 +428,7 @@ public class Game
         {
             SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
             rect.Bottom += graphRect.Height;
+            rect.Bottom++;
 
             _memory.Render(graphRect, renderer, false);
         }
