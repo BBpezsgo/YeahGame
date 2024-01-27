@@ -21,6 +21,7 @@ public class Biscuit
             Biscuit.Save();
         }
     }
+
     public static string? Username
     {
         get
@@ -35,11 +36,28 @@ public class Biscuit
         }
     }
 
+    public static string? ConnectionType
+    {
+        get
+        {
+            Biscuit.Load();
+            return _singleton._connectionType;
+        }
+        set
+        {
+            _singleton._connectionType = value;
+            Biscuit.Save();
+        }
+    }
+
     [JsonPropertyName("socket"), JsonRequired, JsonInclude]
     public string? _socket;
 
     [JsonPropertyName("username"), JsonRequired, JsonInclude]
     public string? _username;
+
+    [JsonPropertyName("connection_type"), JsonRequired, JsonInclude]
+    public string? _connectionType;
 
     const string FileName = "biscuit.json";
 

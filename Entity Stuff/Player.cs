@@ -72,7 +72,7 @@ public class Player : NetworkEntity
         if (!Mouse.WasUsed &&
             Mouse.IsPressed(MouseButton.Left) &&
             Time.Now - LastShot >= ReloadTime &&
-            !Game.Singleton.GameScene.Chat.Rect.Contains(Mouse.RecordedConsolePosition))
+            !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition))
         {
             Vector2 velocity = Mouse.RecordedConsolePosition - Position;
             velocity *= new Vector2(1f, 2f);

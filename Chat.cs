@@ -3,14 +3,17 @@ using YeahGame.Messages;
 
 namespace YeahGame;
 
+using MessageSource = (bool IsServer, bool IsSystem, IPEndPoint? EndPoint);
+
 public class Chat
 {
     const int MessagesShownWhenInactive = 5;
     const int MessagesShownWhenActive = 15;
+    const int TimeToHideMessage = 10;
 
     public struct Message
     {
-        public (bool IsServer, IPEndPoint? EndPoint) Source;
+        public MessageSource Source;
         public float Time;
         public string Content;
 
@@ -19,6 +22,8 @@ public class Chat
         {
             get
             {
+                if (Source.IsSystem)
+                { return string.Empty; }
                 if (Game.Connection.TryGetUserInfo(Source.EndPoint, out ConnectionUserInfo<PlayerInfo> sourceInfo) &&
                     sourceInfo.Info is not null)
                 { return $"<{sourceInfo.Info.Username}>"; }
@@ -32,7 +37,7 @@ public class Chat
         }
         public readonly string ContentText => Content.Trim();
 
-        public Message((bool IsServer, IPEndPoint? EndPoint) source, float time, string content)
+        public Message(MessageSource source, float time, string content)
         {
             Source = source;
             Time = time;
@@ -98,6 +103,58 @@ public class Chat
         _isSending = false;
     }
 
+    public void Send(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        { return; }
+
+        if (!Game.IsOffline)
+        {
+            _isSending = !Game.IsServer || Game.Connection.Connections.Count > 0;
+            Game.Connection.Send(new ChatMessage()
+            {
+                Content = message,
+                Source = Game.Connection.LocalEndPoint,
+                SourceIsServer = Game.IsServer,
+                SourceIsSystem = false,
+                Time = Time.Now,
+
+                ShouldAck = true,
+                Callback = OnSent,
+            });
+        }
+
+        if (Game.IsServer ||
+            Game.IsOffline)
+        { Add(new Message((true, false, Game.Connection.LocalEndPoint), (float)Time.NowNoCache, message)); }
+    }
+
+    public void SendSystem(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        { return; }
+
+        if (!Game.IsOffline)
+        {
+            _isSending = !Game.IsServer || Game.Connection.Connections.Count > 0;
+            Game.Connection.Send(new ChatMessage()
+            {
+                Content = message,
+                Source = Game.Connection.LocalEndPoint,
+                SourceIsServer = Game.IsServer,
+                SourceIsSystem = true,
+                Time = Time.Now,
+
+                ShouldAck = true,
+                Callback = OnSent,
+            });
+        }
+
+        if (Game.IsServer ||
+            Game.IsOffline)
+        { Add(new Message((true, true, Game.Connection.LocalEndPoint), (float)Time.NowNoCache, message)); }
+    }
+
     public void Render()
     {
         if (Keyboard.IsKeyDown('\r'))
@@ -107,25 +164,7 @@ public class Chat
                 string msgContent = _chatInput.Value.ToString().Trim();
                 _chatInput.Clear();
 
-                if (!string.IsNullOrEmpty(msgContent))
-                {
-                    _isSending = true;
-                    Game.Connection.Send(new ChatMessage()
-                    {
-                        Content = msgContent,
-                        Source = Game.Connection.LocalEndPoint,
-                        SourceIsServer = Game.Connection.IsServer,
-                        Time = Time.Now,
-
-                        ShouldAck = true,
-                        Callback = OnSent,
-                    });
-
-                    if (Game.Connection.IsServer)
-                    {
-                        Add(new Message((true, Game.Connection.LocalEndPoint), Time.Now, msgContent));
-                    }
-                }
+                Send(msgContent);
 
                 _isChatting = false;
             }
@@ -141,20 +180,24 @@ public class Chat
         for (int i = 0; i < messages.Length; i++)
         {
             ref Message message = ref messages[i];
-            string timeText = message.TimePrefix;
-            string sourceText = message.SourcePrefix;
-            string contentText = message.ContentText;
 
             int x = 1;
 
+            string timeText = message.TimePrefix;
             Game.Renderer.Text(x, y, timeText, CharColor.Gray);
             x += timeText.Length + 1;
 
-            Game.Renderer.Text(x, y, sourceText, CharColor.Silver);
-            x += sourceText.Length + 1;
+            if (!message.Source.IsSystem)
+            {
+                string sourceText = message.SourcePrefix;
+                Game.Renderer.Text(x, y, sourceText, CharColor.Silver);
+                x += sourceText.Length + 1;
+            }
 
-            Game.Renderer.Text(x, y, contentText, CharColor.Silver);
+            string contentText = message.ContentText;
+            Game.Renderer.Text(x, y, contentText, message.Source.IsSystem ? CharColor.BrightYellow : CharColor.Silver);
             // x += contentText.Length + 1;
+
             y--;
         }
 
@@ -181,9 +224,11 @@ public class Chat
         _chatMessages.Sort((a, b) => a.Time.CompareTo(b.Time));
     }
 
+    public void AddSystem(string message) => Add(new Message((false, true, null), (float)Time.NowNoCache, message));
+
     public void Feed(ChatMessage message, IPEndPoint source)
     {
-        Add(new Message((message.SourceIsServer, message.Source ?? source), message.Time, message.Content));
+        Add(new Message((message.SourceIsServer, message.SourceIsSystem, message.Source ?? source), message.Time, message.Content));
     }
 
     public IEnumerable<Message> GetMessages()
@@ -203,7 +248,7 @@ public class Chat
 
             for (int i = _chatMessages.Count - 1; i >= last; i--)
             {
-                if (Time.Now - _chatMessages[i].Time > 10) continue;
+                if (Time.Now - _chatMessages[i].Time >= TimeToHideMessage) continue;
 
                 yield return _chatMessages[i];
             }

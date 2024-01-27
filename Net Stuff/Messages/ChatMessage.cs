@@ -6,6 +6,7 @@ namespace YeahGame.Messages;
 public class ChatMessage : ReliableMessage
 {
     public required bool SourceIsServer { get; set; }
+    public required bool SourceIsSystem { get; set; }
     public required IPEndPoint? Source { get; set; }
     public required float Time { get; set; }
     public required string Content { get; set; }
@@ -23,6 +24,7 @@ public class ChatMessage : ReliableMessage
     {
         base.Deserialize(reader);
         SourceIsServer = reader.ReadBoolean();
+        SourceIsSystem = reader.ReadBoolean();
         Source = reader.ReadNullable(reader.ReadIPEndPoint);
         Time = reader.ReadSingle();
         Content = reader.ReadString();
@@ -32,6 +34,7 @@ public class ChatMessage : ReliableMessage
     {
         base.Serialize(writer);
         writer.Write(SourceIsServer);
+        writer.Write(SourceIsSystem);
         writer.WriteNullable(Source, writer.Write);
         writer.Write(Time);
         writer.Write(Content);
@@ -47,6 +50,7 @@ public class ChatMessage : ReliableMessage
         Callback = Callback,
 
         SourceIsServer = SourceIsServer,
+        SourceIsSystem = SourceIsSystem,
         Source = Source,
         Time = Time,
         Content = Content,

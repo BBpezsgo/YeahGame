@@ -422,6 +422,14 @@ public static class Ascii
         '―',
     };
 
+    public static readonly char[] Loading = new char[]
+    {
+        '|',
+        '/',
+        '-',
+        '\\',
+    };
+
     public static readonly char[] Stuff1 = "¨`¯´˚˙˘˜˝΄΅·´῾῭΅`῝῞῟῁῀᾿᾽῏῎῍՚՛՜՝՞՟‘’‛“”‟\"'".ToCharArray();
 
     public static readonly Dictionary<char, char> UpperIndex = new() {

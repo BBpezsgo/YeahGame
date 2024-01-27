@@ -72,6 +72,8 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
             v.Info,
             v.IsServer,
             v.ReceivedAt < v.RequestedAt);
+
+        public static ConnectionUserInfoPrivate GetLoadingInstance(bool isServer) => new(default, isServer, 0f);
     }
 
     public event ConnectionBase.ClientConnectedEventHandler? OnClientConnected;
@@ -459,33 +461,39 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
                         Debug.WriteLine($"[Net]: <= {source} == {_message}");
 
-                        if (IsServer)
-                        {
-                            if (_message.Source is not null)
-                            {
-                                _userInfos[_message.Source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache);
-                            }
-                            else
-                            {
-                                _userInfos[source] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), false, (float)Time.NowNoCache);
-                            }
+                        IPEndPoint? infoSource = _message.Source;
 
-                            Send(_message);
+                        if (IsServer)
+                        { infoSource ??= source; }
+
+                        if (_message.IsServer)
+                        { infoSource ??= RemoteEndPoint; }
+
+                        if (infoSource is null)
+                        {
+                            Debug.WriteLine($"[Net]: User info (sent by {source}) source is null");
                         }
                         else
                         {
-                            if (_message.Source is not null &&
-                                !_message.IsServer)
+                            TUserInfo data = Utils.Deserialize<TUserInfo>(_message.Details);
+                            if (!IsServer)
                             {
-                                TUserInfo data = Utils.Deserialize<TUserInfo>(_message.Details);
-                                _userInfos[_message.Source] = new ConnectionUserInfoPrivate(data, false, (float)Time.NowNoCache);
-                                if (_message.Source.Equals(LocalEndPoint))
+                                if (infoSource.Equals(LocalEndPoint))
                                 { LocalUserInfo = data; }
                             }
-                            else if (_message.IsServer && RemoteEndPoint is not null)
+                            _userInfos[infoSource] = new ConnectionUserInfoPrivate(data, _message.IsServer, (float)Time.NowNoCache);
+                        }
+
+                        if (IsServer)
+                        {
+                            Send(new InfoResponseMessage()
                             {
-                                _userInfos[RemoteEndPoint] = new ConnectionUserInfoPrivate(Utils.Deserialize<TUserInfo>(_message.Details), true, (float)Time.NowNoCache);
-                            }
+                                ShouldAck = false,
+
+                                IsServer = false,
+                                Source = _message.Source ?? source,
+                                Details = _message.Details,
+                            });
                         }
 
                         return;
@@ -500,72 +508,83 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
                         if (IsServer)
                         {
-                            if (_message.FromServer)
+                            if (_message.FromServer ||
+                                (_message.From?.Equals(LocalEndPoint) ?? false))
                             {
-                                if (LocalUserInfo is not null)
+                                if (LocalUserInfo is null)
+                                { return; }
+
+                                SendTo(new InfoResponseMessage()
                                 {
+                                    IsServer = true,
+                                    Source = null,
+                                    Details = Utils.Serialize(LocalUserInfo),
+                                }, source);
+                                return;
+                            }
+
+                            if (_message.From is not null)
+                            {
+                                if (_userInfos.TryGetValue(_message.From, out ConnectionUserInfoPrivate? info))
+                                {
+                                    if (info.Info is null)
+                                    { return; }
+
                                     SendTo(new InfoResponseMessage()
                                     {
-                                        IsServer = true,
-                                        Source = null,
-                                        Details = Utils.Serialize(LocalUserInfo),
+                                        IsServer = false,
+                                        Source = _message.From,
+                                        Details = Utils.Serialize(info.Info),
                                     }, source);
-                                }
-                            }
-                            else
-                            {
-                                if (_message.From is not null)
-                                {
-                                    if (_userInfos.TryGetValue(_message.From, out ConnectionUserInfoPrivate? info))
-                                    {
-                                        if (info.Info != null)
-                                        {
-                                            SendTo(new InfoResponseMessage()
-                                            {
-                                                IsServer = false,
-                                                Source = _message.From,
-                                                Details = Utils.Serialize(info.Info),
-                                            }, source);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        _userInfos.Add(_message.From, new ConnectionUserInfoPrivate(default, false, 0f));
-                                        SendTo(new InfoRequestMessage()
-                                        {
-                                            From = _message.From,
-                                            FromServer = false,
-                                        }, _message.From);
-                                    }
                                 }
                                 else
                                 {
-                                    foreach (KeyValuePair<IPEndPoint, ConnectionUserInfoPrivate> item in _userInfos)
+                                    _userInfos.Add(_message.From, ConnectionUserInfoPrivate.GetLoadingInstance(false));
+                                    SendTo(new InfoRequestMessage()
                                     {
-                                        if (item.Value.Info != null)
-                                        {
-                                            SendTo(new InfoResponseMessage()
-                                            {
-                                                IsServer = false,
-                                                Source = item.Key,
-                                                Details = Utils.Serialize(item.Value.Info),
-                                            }, source);
-                                        }
-                                    }
+                                        From = _message.From,
+                                        FromServer = false,
+                                    }, _message.From);
                                 }
+
+                                return;
                             }
-                        }
-                        else
-                        {
+
+                            foreach ((IPEndPoint key, ConnectionUserInfoPrivate value) in _userInfos)
+                            {
+                                if (value.Info is null)
+                                { continue; }
+
+                                SendTo(new InfoResponseMessage()
+                                {
+                                    IsServer = false,
+                                    Source = key,
+                                    Details = Utils.Serialize(value.Info),
+                                }, source);
+                            }
+#if !SERVER
                             if (LocalUserInfo is not null)
                             {
                                 SendTo(new InfoResponseMessage()
                                 {
-                                    IsServer = false,
+                                    IsServer = true,
                                     Source = null,
                                     Details = Utils.Serialize(LocalUserInfo),
                                 }, source);
                             }
+#endif
+                        }
+                        else
+                        {
+                            if (LocalUserInfo is null)
+                            { return; }
+
+                            SendTo(new InfoResponseMessage()
+                            {
+                                IsServer = false,
+                                Source = null,
+                                Details = Utils.Serialize(LocalUserInfo),
+                            }, source);
                         }
 
                         return;

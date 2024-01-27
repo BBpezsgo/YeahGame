@@ -5,6 +5,8 @@ public static class Time
     const double TargetFPS = 60;
     const double TargetDeltaTime = 1d / TargetFPS;
 
+    const bool ClampFPS = false;
+
     static double lastTime;
     static double now;
     static double deltaTime;
@@ -35,7 +37,8 @@ public static class Time
         deltaTime = now - lastTime;
         lastTime = now;
 
-        if (deltaTime < TargetDeltaTime)
+        if (ClampFPS &&
+            deltaTime < TargetDeltaTime)
         { Thread.Sleep((int)((TargetDeltaTime - deltaTime) * 1000d)); }
     }
 }

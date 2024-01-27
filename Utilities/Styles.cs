@@ -2,6 +2,21 @@
 
 public static class Styles
 {
+    public static readonly ConsoleSelectBoxStyle SelectBoxStyle= new()
+    {
+        LabelNormal = CharColor.Make(CharColor.Black, CharColor.Silver),
+        LabelHover = CharColor.Make(CharColor.Black, CharColor.White),
+        LabelDown = CharColor.Make(CharColor.Black, CharColor.White),
+        LabelActive = CharColor.Make(CharColor.Black, CharColor.White),
+
+        ButtonNormal = CharColor.Make(CharColor.Black, CharColor.Silver),
+        ButtonHover = CharColor.Make(CharColor.Black, CharColor.White),
+        ButtonDown = CharColor.Make(CharColor.Black, CharColor.BrightCyan),
+
+        LeftChar = '<',
+        RightChar = '>',
+    };
+
     public static readonly ConsoleButtonStyle ButtonStyle = new()
     {
         Normal = CharColor.Make(CharColor.Black, CharColor.Silver),

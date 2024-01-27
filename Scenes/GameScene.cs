@@ -170,7 +170,11 @@ public class GameScene : Scene
                 { builder.Append(" (Server)"); }
 
                 if (item.Value.IsRefreshing)
-                { builder.Append(" (Refreshing ...)"); }
+                {
+                    builder.Append(' ');
+                    int loadingCharIndex = (int)(Time.Now * 8) % Ascii.Loading.Length;
+                    builder.Append(Ascii.Loading[loadingCharIndex]);
+                }
 
                 Game.Renderer.Text(box.Left, box.Top + y++, builder.ToString(), color);
             }
@@ -410,6 +414,11 @@ public class GameScene : Scene
         Game.Singleton.MenuScene.ExitReason = "Disconnected form server";
     }
 
+    public void OnConnectedToServer(ConnectingPhase phase)
+    {
+        if (phase != ConnectingPhase.Handshake) return;
+    }
+
     public void OnClientDisconnected(IPEndPoint client)
     {
         for (int i = Players.Count - 1; i >= 0; i--)
@@ -418,6 +427,8 @@ public class GameScene : Scene
             if (player != null && client.Equals(player.Owner))
             { DestroyEntity(player); }
         }
+
+        Chat.SendSystem($"Client {client} disconnected");
     }
 
     public void OnClientConnected(IPEndPoint client, ConnectingPhase phase)
@@ -452,6 +463,8 @@ public class GameScene : Scene
             NetworkId = GenerateNetworkId(),
             Position = GetSpawnPoint(),
         });
+
+        Chat.SendSystem($"Client {client} connected");
     }
 
     public void OnMessageReceived(Message message, IPEndPoint source)
@@ -656,6 +669,35 @@ public class GameScene : Scene
     #endregion
 
     #region Utils
+
+    public bool MouseBlockedByUI(Coord point)
+    {
+        if (Keyboard.IsKeyHold('\t'))
+        {
+            return true;
+        }
+
+        if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
+        {
+            SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Size));
+            if (box.Contains(point)) return true;
+        }
+
+        // if (Game.Connection.LocalUserInfo is not null)
+        // {
+        //     PlayerInfo info = Game.Connection.LocalUserInfo;
+        //     int y = Game.Renderer.Height - 2;
+        //     for (int i = 0; i < info.Items.Value.Count; i++)
+        //     {
+        //         ItemType item = info.Items.Value[i];
+        //         Game.Renderer.Text(Game.Renderer.Width - 10, y--, item.ToString());
+        //     }
+        // }
+
+        if (Chat.Rect.Contains(point)) return true;
+
+        return false;
+    }
 
     Vector2 GetSpawnPoint()
     {

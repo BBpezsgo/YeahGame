@@ -71,7 +71,7 @@ public class Program
 
         Game game = new(
 #if !SERVER
-            OperatingSystem.IsWindows() ? new ConsoleRenderer() : null!
+            OperatingSystem.IsWindows() ? new ConsoleRenderer() : new AnsiRenderer()
 #endif
             );
         game.Start(args);

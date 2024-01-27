@@ -18,7 +18,15 @@ public class MenuScene : Scene
     const string ConnectionType_UDP = "UDP";
     const string ConnectionType_WebSocket = "WebSocket";
 
-    readonly ConsoleSelectBox<string> ConnectionType = new(ConnectionType_UDP, ConnectionType_WebSocket);
+    readonly ConsoleSelectBox<string> ConnectionType = new(ConnectionType_UDP, ConnectionType_WebSocket)
+    {
+        SelectedIndex = Biscuit.ConnectionType switch
+        {
+            ConnectionType_UDP => 0,
+            ConnectionType_WebSocket => 1,
+            _ => -1,
+        },
+    };
 
     public string? ExitReason;
 
@@ -27,6 +35,19 @@ public class MenuScene : Scene
         base.Load();
         InputSocket.Value = new System.Text.StringBuilder(Biscuit.Socket);
         InputName.Value = new System.Text.StringBuilder(Biscuit.Username);
+        ConnectionType.SelectedIndex = Biscuit.ConnectionType switch
+        {
+            ConnectionType_UDP => 0,
+            ConnectionType_WebSocket => 1,
+            _ => -1,
+        };
+        Game.Connection = ConnectionType.SelectedItem switch
+        {
+            ConnectionType_UDP => new UdpConnection<PlayerInfo>(),
+            ConnectionType_WebSocket => new WebSocketConnection<PlayerInfo>(),
+            _ => null!,
+        };
+        Game.Singleton.SetupConnectionListeners();
     }
 
     public override void Unload()
@@ -100,7 +121,8 @@ public class MenuScene : Scene
 
             if (Game.Renderer.SelectBox(
                 new SmallRect(box.Left, box.Top + y++, box.Width, 1),
-                ConnectionType))
+                ConnectionType,
+                Styles.SelectBoxStyle))
             {
                 Game.Connection = ConnectionType.SelectedItem switch
                 {
@@ -108,7 +130,7 @@ public class MenuScene : Scene
                     ConnectionType_WebSocket => new WebSocketConnection<PlayerInfo>(),
                     _ => null!,
                 };
-                Game.Singleton.SetupConnectionListeners(Game.Connection);
+                Game.Singleton.SetupConnectionListeners();
             }
 
             y++;
@@ -117,8 +139,9 @@ public class MenuScene : Scene
             {
                 InputSocketError = null;
 
-                Game.Connection ??= new UdpConnection<PlayerInfo>();
-                Game.Singleton.SetupConnectionListeners(Game.Connection);
+                if (!Game.HasConnection)
+                { Game.Connection = new UdpConnection<PlayerInfo>(); }
+                Game.Singleton.SetupConnectionListeners();
                 Game.Connection.LocalUserInfo = new PlayerInfo()
                 {
                     Username = InputName.Value.ToString(),
@@ -154,6 +177,7 @@ public class MenuScene : Scene
 
                         Biscuit.Socket = InputSocket.Value.ToString();
                         Biscuit.Username = InputName.Value.ToString();
+                        Biscuit.ConnectionType = ConnectionType.SelectedItem;
                     }
                     catch (SocketException socketException)
                     { InputSocketError = socketException.SocketErrorCode.ToString(); }
@@ -198,6 +222,7 @@ public class MenuScene : Scene
 
                             Biscuit.Socket = InputSocket.Value.ToString();
                             Biscuit.Username = InputName.Value.ToString();
+                            Biscuit.ConnectionType = ConnectionType.SelectedItem;
                         }
                         catch (SocketException socketException)
                         { InputSocketError = socketException.SocketErrorCode.ToString(); }

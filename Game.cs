@@ -6,46 +6,11 @@ using Win32.LowLevel;
 
 namespace YeahGame;
 
-public class PlayerInfo : ISerializable
-{
-    public Changed<string> Username;
-    public ImmutableChanged<List<ItemType>> Items = new List<ItemType>();
-
-    public void Deserialize(BinaryReader reader)
-    {
-        Bitfield _changedBitfield = reader.ReadByte();
-
-        if (_changedBitfield[0])
-        { Username = reader.ReadString(); }
-        Username.WasChanged = false;
-
-        if (_changedBitfield[1])
-        { Items = new List<ItemType>(reader.ReadCollection(static v => (ItemType)v.ReadByte())); }
-        Items.WasChanged = false;
-    }
-
-    public void Serialize(BinaryWriter writer)
-    {
-        Bitfield _changedBitfield = 0;
-        _changedBitfield[0] = Username.WasChanged;
-        _changedBitfield[1] = Items.WasChanged;
-        writer.Write((byte)_changedBitfield);
-
-        if (Username.WasChanged)
-        { writer.Write(Username); }
-        Username.WasChanged = false;
-
-        if (Items.WasChanged)
-        { writer.Write(Items.Value, static (v, item) => v.Write((byte)item)); }
-        Items.WasChanged = false;
-    }
-}
-
 public class Game
 {
     #region Constants
 
-    const int GraphWidth = 20;
+    const int GraphWidth = 26;
     const bool DebugPanel = true;
 
     #endregion
@@ -94,9 +59,9 @@ public class Game
     readonly ConsoleDropdown _fpsDropdown = new();
     readonly ConsoleDropdown _sentBytesDropdown = new();
     readonly ConsoleDropdown _receivedBytesDropdown = new();
-    // readonly ConsoleDropdown _memoryDropdown = new();
+    readonly ConsoleDropdown _memoryDropdown = new();
 
-    readonly ConsolePanel _debugPanel = new(new SmallRect(1, 1, 33, 2));
+    readonly ConsolePanel _debugPanel = new(new SmallRect(0, 0, 33, 2), ConsolePanel.DockTop | ConsolePanel.DockRight);
 
     float _lastConnectionCounterReset;
     Graph _sentBytes = new(GraphWidth + 1);
@@ -110,10 +75,10 @@ public class Game
     MinMax<int> _currentFps;
     Graph _fps = new(GraphWidth + 1);
 
-    // float _lastMemoryCounterReset;
-    // long _lastAllocatedMemory;
-    // int _allocatePerSec;
-    // Graph _memory = new(GraphWidth + 1);
+    float _lastMemoryCounterReset;
+    long _lastAllocatedMemory;
+    int _allocatePerSec;
+    Graph _memory = new(GraphWidth + 1);
 
 #endif
 
@@ -150,12 +115,14 @@ public class Game
 #endif
     }
 
-    public void SetupConnectionListeners<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo>(ConnectionBase<TUserInfo> connection) where TUserInfo : ISerializable
+    public void SetupConnectionListeners()
     {
-        connection.OnMessageReceived += GameScene.OnMessageReceived;
-        connection.OnClientConnected += GameScene.OnClientConnected;
-        connection.OnClientDisconnected += GameScene.OnClientDisconnected;
-        connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
+        if (_connection is null) return;
+        _connection.OnMessageReceived += GameScene.OnMessageReceived;
+        _connection.OnClientConnected += GameScene.OnClientConnected;
+        _connection.OnClientDisconnected += GameScene.OnClientDisconnected;
+        _connection.OnConnectedToServer += GameScene.OnConnectedToServer;
+        _connection.OnDisconnectedFromServer += GameScene.OnDisconnectedFromServer;
     }
 
     public static void Stop()
@@ -181,7 +148,7 @@ public class Game
     public void Start(string[] args)
     {
 #if !SERVER
-        bool wasResized = false;
+        bool wasResized = true;
 #endif
 
 #if SERVER
@@ -202,6 +169,8 @@ public class Game
                 Console.BufferHeight = 30;
             }
 
+            renderer.RefreshBufferSize();
+
             ConsoleListener.KeyEvent += Keyboard.Feed;
             ConsoleListener.MouseEvent += Mouse.Feed;
             ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
@@ -212,6 +181,8 @@ public class Game
                 ConsoleHandler.Setup();
             }
         }
+
+        _debugPanel.Rect.X = (short)(renderer.Width - _debugPanel.Rect.Width);
 #endif
 
         _shouldRun = true;
@@ -230,7 +201,7 @@ public class Game
             {
                 renderer.RefreshBufferSize();
                 wasResized = false;
-                _debugPanel.ClampPosition(renderer.Size);
+                _debugPanel.RefreshPosition(renderer.Size);
             }
             else
             {
@@ -252,6 +223,19 @@ public class Game
             ConsoleListener.Stop();
             ConsoleHandler.Restore();
         }
+    }
+
+    public bool MouseBlockedByUI(Coord point)
+    {
+        if (DebugPanel)
+        {
+            if (_debugPanel.Rect.Contains(point)) return true;
+            if (_debugPanel.IsActive) return true;
+        }
+
+        if (GameScene.IsLoaded && GameScene.MouseBlockedByUI(point)) return true;
+
+        return false;
     }
 
     void ProcessArguments(string[] args)
@@ -337,112 +321,23 @@ public class Game
 #if !SERVER
         if (DebugPanel)
         {
-            /*
-            if (Utils.IsDebug)
-            {
-                if (Time.Now - _lastMemoryCounterReset >= 1f)
-                {
-                    long currentAllocatedMemory = GC.GetTotalAllocatedBytes();
-                    _lastMemoryCounterReset = Time.Now;
-                    _allocatePerSec = (int)(currentAllocatedMemory - _lastAllocatedMemory);
-                    _memory.Append(_allocatePerSec);
-                    _lastAllocatedMemory = currentAllocatedMemory;
-                }
-            }
-            */
+            // TickMemoryMetrics();
 
-            if (Time.Now - _lastFpsCounterReset >= 1f)
-            {
-                _lastFpsCounterReset = Time.Now;
-                // int diff = _currentFps.Difference;
-                // byte color = diff switch
-                // {
-                //     < 50 => CharColor.White,
-                //     < 100 => CharColor.BrightYellow,
-                //     _ => CharColor.BrightRed,
-                // };
-                _fps.Append(_currentFps.Min);
+            TickFpsMetrics();
 
-                _currentFps.Reset();
-            }
-            else
-            {
-                _currentFps.Set((int)Time.FPS);
-            }
-
-            if (_connection is not null && Time.Now - _lastConnectionCounterReset >= 1f)
-            {
-                _lastConnectionCounterReset = Time.Now;
-                _sentBytesPerSec = _connection.SentBytes;
-                _receivedBytesPerSec = _connection.ReceivedBytes;
-                int loss = _connection.LostPackets - _lastLostPackets;
-                _lastLostPackets = _connection.LostPackets;
-
-                _packetLoss = (_connection.ReceivedPackets == 0) ? 1f : (1f - ((float)_lastLostPackets / (float)_connection.ReceivedPackets));
-
-                _sentBytes.Append(_sentBytesPerSec);
-                _receivedBytes.Append(_receivedBytesPerSec, loss switch
-                {
-                    > 1 => CharColor.BrightRed,
-                    > 0 => CharColor.Yellow,
-                    _ => CharColor.White,
-                });
-
-                _connection.ResetCounter();
-            }
+            TickConnectionMetrics();
 
             renderer.Fill(_debugPanel.Rect, 0, ' ');
             renderer.Panel(_debugPanel, _debugPanel.IsActive ? CharColor.BrightCyan : CharColor.White, in Ascii.PanelSides);
             ref SmallRect rect = ref _debugPanel.Rect;
 
-            int y = rect.Y + 1;
+            rect.Bottom = (short)(rect.Top + 1);
 
-            renderer.Dropdown(rect.X + 1, y, _fpsDropdown, $"FPS: {_currentFps.Min}", Styles.DropdownStyle);
-            y++;
-            if (_fpsDropdown)
-            {
-                SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-                y += graphRect.Height;
-                _fps.Render(graphRect, renderer, true);
-            }
+            DrawFpsMetrics(ref rect);
 
-            if (_connection is not null)
-            {
-                renderer.Text(rect.X + 1, y++, $"State: {_connection.State}");
-                renderer.Text(rect.X + 1, y++, $"Lost Packets: {_connection.LostPackets}");
+            DrawConnectionMetrics(ref rect);
 
-                renderer.Dropdown(rect.X + 1, y, _sentBytesDropdown, $"Sent: {_sentBytesPerSec} bytes/sec", Styles.DropdownStyle);
-                y++;
-                if (_sentBytesDropdown)
-                {
-                    SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-                    y += graphRect.Height;
-                    _sentBytes.Render(graphRect, renderer, false);
-                }
-
-                renderer.Dropdown(rect.X + 1, y, _receivedBytesDropdown, $"Received: {_receivedBytesPerSec} bytes/sec ({(_packetLoss * 100):0}%)", Styles.DropdownStyle);
-                y++;
-                if (_receivedBytesDropdown)
-                {
-                    SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-                    y += graphRect.Height;
-                    _receivedBytes.Render(graphRect, renderer, false);
-                }
-            }
-
-            // if (Utils.IsDebug)
-            // {
-            //     renderer.Dropdown(rect.X + 1, y, _memoryDropdown, $"Alloc: {Utils.FormatMemorySize(_allocatePerSec)}/sec", Utils.DropdownStyle);
-            //     y++;
-            //     if (_memoryDropdown)
-            //     {
-            //         SmallRect graphRect = new(rect.X + 1, y, GraphWidth, 5);
-            //         y += graphRect.Height;
-            //         _memory.Render(graphRect, renderer, false);
-            //     }
-            // }
-
-            rect.Height = (short)(y - rect.Y);
+            // DrawMemoryMetrics(ref rect);
         }
 
         // {
@@ -450,5 +345,143 @@ public class Game
         //     renderer[Mouse.RecordedConsolePosition] = new ConsoleChar(c.Char, CharColor.Invert(c.Foreground), CharColor.Invert(c.Background));
         // }
 #endif
+    }
+
+    void DrawFpsMetrics(ref SmallRect rect)
+    {
+        renderer.Dropdown(rect.X + 1, rect.Bottom, _fpsDropdown, $"FPS: {_currentFps.Min}", Styles.DropdownStyle);
+        rect.Bottom++;
+
+        if (_fpsDropdown)
+        {
+            SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
+            rect.Bottom += graphRect.Height;
+            _fps.Render(graphRect, renderer, true);
+        }
+    }
+
+    void DrawConnectionMetrics(ref SmallRect rect)
+    {
+        if (_connection is null)
+        { return; }
+
+        renderer.Text(rect.X + 1, rect.Bottom, $"State: {(Game.IsOffline ? "Offline" : _connection.State.ToString())}");
+        rect.Bottom++;
+
+        if (_connection.IsConnected)
+        {
+            if (!_connection.IsServer)
+            {
+                renderer.Text(rect.X + 1, rect.Bottom, $"RemoteEP: {_connection.RemoteEndPoint}");
+                rect.Bottom++;
+            }
+
+            renderer.Text(rect.X + 1, rect.Bottom, $"LocalEP: {_connection.LocalEndPoint}");
+            rect.Bottom++;
+        }
+
+        renderer.Text(rect.X + 1, rect.Bottom, $"Lost Packets: {_connection.LostPackets}");
+        rect.Bottom++;
+
+        renderer.Dropdown(rect.X + 1, rect.Bottom, _sentBytesDropdown, $"Sent: {_sentBytesPerSec} bytes/sec", Styles.DropdownStyle);
+        rect.Bottom++;
+
+        if (_sentBytesDropdown)
+        {
+            SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
+            rect.Bottom += graphRect.Height;
+
+            _sentBytes.Render(graphRect, renderer, false);
+        }
+
+        renderer.Dropdown(rect.X + 1, rect.Bottom, _receivedBytesDropdown, $"Received: {_receivedBytesPerSec} bytes/sec ({(_packetLoss * 100):0}%)", Styles.DropdownStyle);
+        rect.Bottom++;
+
+        if (_receivedBytesDropdown)
+        {
+            SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
+            rect.Bottom += graphRect.Height;
+
+            _receivedBytes.Render(graphRect, renderer, false);
+        }
+    }
+
+    void DrawMemoryMetrics(ref SmallRect rect)
+    {
+        if (!Utils.IsDebug)
+        { return; }
+
+        renderer.Dropdown(rect.X + 1, rect.Bottom, _memoryDropdown, $"Alloc: {Utils.FormatMemorySize(_allocatePerSec)}/sec", Styles.DropdownStyle);
+        rect.Bottom++;
+
+        if (_memoryDropdown)
+        {
+            SmallRect graphRect = new(rect.X + 1, rect.Bottom, GraphWidth, 5);
+            rect.Bottom += graphRect.Height;
+
+            _memory.Render(graphRect, renderer, false);
+        }
+    }
+
+    void TickMemoryMetrics()
+    {
+        if (!Utils.IsDebug)
+        { return; }
+
+        if (Time.Now - _lastMemoryCounterReset < 1f)
+        { return; }
+
+        long currentAllocatedMemory = GC.GetTotalAllocatedBytes();
+        _lastMemoryCounterReset = Time.Now;
+        _allocatePerSec = (int)(currentAllocatedMemory - _lastAllocatedMemory);
+        _memory.Append(_allocatePerSec);
+        _lastAllocatedMemory = currentAllocatedMemory;
+    }
+
+    void TickFpsMetrics()
+    {
+        if (Time.Now - _lastFpsCounterReset >= 1f)
+        {
+            _lastFpsCounterReset = Time.Now;
+            // int diff = _currentFps.Difference;
+            // byte color = diff switch
+            // {
+            //     < 50 => CharColor.White,
+            //     < 100 => CharColor.BrightYellow,
+            //     _ => CharColor.BrightRed,
+            // };
+            _fps.Append(_currentFps.Min);
+
+            _currentFps.Reset();
+        }
+        else
+        {
+            _currentFps.Set((int)Time.FPS);
+        }
+    }
+
+    void TickConnectionMetrics()
+    {
+        if (_connection is null ||
+            Time.Now - _lastConnectionCounterReset < 1f)
+        { return; }
+
+        _lastConnectionCounterReset = Time.Now;
+        _sentBytesPerSec = _connection.SentBytes;
+        _receivedBytesPerSec = _connection.ReceivedBytes;
+        int loss = _connection.LostPackets - _lastLostPackets;
+        _lastLostPackets = _connection.LostPackets;
+
+        _packetLoss = (_connection.ReceivedPackets == 0) ? 1f : (1f - ((float)_lastLostPackets / (float)_connection.ReceivedPackets));
+
+        _sentBytes.Append(_sentBytesPerSec);
+        _receivedBytes.Append(_receivedBytesPerSec, loss switch
+        {
+            > 1 => CharColor.BrightRed,
+            > 0 => CharColor.Yellow,
+            _ => CharColor.White,
+        });
+
+        _connection.ResetCounter();
     }
 }
