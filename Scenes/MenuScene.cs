@@ -65,8 +65,7 @@ public class MenuScene : Scene
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1);
 
-            int center = Layout.Center(box.Width, ExitReason);
-            Game.Renderer.Text(box.Left + center, box.Top + 1, ExitReason);
+            Game.Renderer.Text(box.Left + Layout.Center(ExitReason, box.Width), box.Top + 1, ExitReason);
 
             if (Game.Renderer.Button(new SmallRect(box.X, box.Top + 3, box.Width, 1), "OK", Styles.ButtonStyle))
             {
@@ -88,8 +87,7 @@ public class MenuScene : Scene
             Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
             box = box.Margin(1);
 
-            int center = Layout.Center(box.Width, text);
-            Game.Renderer.Text(box.Left + center, box.Top + 1, text);
+            Game.Renderer.Text(box.Left + Layout.Center(text, box.Width), box.Top + 1, text);
         }
         else
         {

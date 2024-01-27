@@ -201,7 +201,7 @@ public class Game
             {
                 renderer.RefreshBufferSize();
                 wasResized = false;
-                _debugPanel.RefreshPosition(renderer.Size);
+                OnResized();
             }
             else
             {
@@ -224,6 +224,12 @@ public class Game
             ConsoleHandler.Restore();
         }
     }
+
+    public void OnResized()
+    {
+        if (Game.DebugPanel) _debugPanel.RefreshPosition(renderer.Size);
+    }
+
 
     public bool MouseBlockedByUI(Coord point)
     {
