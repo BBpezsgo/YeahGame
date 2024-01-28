@@ -21,6 +21,7 @@ public class Player : NetworkEntity
 
     Vector2 NetPosition;
     float LastNetPositionTime;
+    CapturedTouch? CapturedTouch;
 
     public override void Update()
     {
@@ -47,6 +48,8 @@ public class Player : NetworkEntity
         {
             Vector2 velocity = default;
 
+            velocity = Game.Singleton.Joystick.Input;
+
             if (Keyboard.IsKeyPressed('W')) velocity.Y = -1f;
             if (Keyboard.IsKeyPressed('S')) velocity.Y = +1f;
             if (Keyboard.IsKeyPressed('A')) velocity.X = -1f;
@@ -69,12 +72,30 @@ public class Player : NetworkEntity
         Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
 #endif
 
-        if (!Mouse.WasUsed &&
-            Mouse.IsPressed(MouseButton.Left) &&
-            Time.Now - LastShot >= ReloadTime &&
-            !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition))
+        CapturedTouch ??= new CapturedTouch();
+        CapturedTouch.Tick(p => !Game.Singleton.MouseBlockedByUI((Coord)p));
+
+        bool shouldShoot = false;
+        Vector2 shootPosition = default;
+
+        if (Touch.IsTouchDevice)
         {
-            Vector2 velocity = Mouse.RecordedConsolePosition - Position;
+            shouldShoot = CapturedTouch.Has;
+            shootPosition = CapturedTouch.Position;
+        }
+        else
+        {
+            shouldShoot = (
+                !Mouse.WasUsed &&
+                Mouse.IsPressed(MouseButton.Left) &&
+                !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition)
+            );
+            shootPosition = Mouse.RecordedConsolePosition;
+        }
+
+        if (Time.Now - LastShot >= ReloadTime && shouldShoot)
+        {
+            Vector2 velocity = shootPosition - Position;
             velocity *= new Vector2(1f, 2f);
             velocity = Vector2.Normalize(velocity);
 

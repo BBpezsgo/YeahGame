@@ -2,6 +2,7 @@
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Win32.Common;
 using Win32.LowLevel;
 
 namespace YeahGame;
@@ -53,6 +54,8 @@ public class Game
 
     ConnectionBase<PlayerInfo>? _connection;
     bool _isOffline;
+
+    public readonly Joystick Joystick = new(default, default);
 
 #if !SERVER
 
@@ -241,6 +244,8 @@ public class Game
 
         if (GameScene.IsLoaded && GameScene.MouseBlockedByUI(point)) return true;
 
+        if (Joystick.Rect.Contains(point)) return true;
+
         return false;
     }
 
@@ -351,6 +356,12 @@ public class Game
         //     renderer[Mouse.RecordedConsolePosition] = new ConsoleChar(c.Char, CharColor.Invert(c.Foreground), CharColor.Invert(c.Background));
         // }
 #endif
+
+        if (Touch.IsTouchDevice)
+        {
+            Joystick.Rect = new SmallRect(new Coord(1, Game.Renderer.Height - 6 - 1), new Coord(11, 6));
+            Joystick.Render(renderer);
+        }
     }
 
     void DrawFpsMetrics(ref SmallRect rect)

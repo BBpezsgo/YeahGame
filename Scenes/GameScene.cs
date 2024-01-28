@@ -192,14 +192,17 @@ public class GameScene : Scene
             ReadOnlySpan<char> text2 = $"Respawn in {Math.Max(0f, RespawnTime - (Time.Now - LocalRespawnTimer)):0.0} sec ...";
             Game.Renderer.Text(box.Left + Layout.Center(text2, box.Width - 2), box.Top + 4, text2, CharColor.White);
         }
-        else if (Game.Connection.LocalUserInfo is not null)
+        else
         {
-            PlayerInfo info = Game.Connection.LocalUserInfo;
-            int y = Game.Renderer.Height - 2;
-            for (int i = 0; i < info.Items.Value.Count; i++)
+            if (Game.Connection.LocalUserInfo is not null)
             {
-                ItemType item = info.Items.Value[i];
-                Game.Renderer.Text(Game.Renderer.Width - 10, y--, item.ToString());
+                PlayerInfo info = Game.Connection.LocalUserInfo;
+                int y = Game.Renderer.Height - 2;
+                for (int i = 0; i < info.Items.Value.Count; i++)
+                {
+                    ItemType item = info.Items.Value[i];
+                    Game.Renderer.Text(Game.Renderer.Width - 10, y--, item.ToString());
+                }
             }
         }
     }
