@@ -1,6 +1,4 @@
-﻿using Win32.Common;
-
-namespace YeahGame;
+﻿namespace YeahGame;
 
 public static class Ascii
 {
@@ -375,11 +373,6 @@ public static class Ascii
         0.8037f,
         0.9999f,
     };
-
-    public static readonly SideCharacters<char> BoxSides = new('┌', '┐', '┘', '└', '─', '│');
-    public static readonly SideCharacters<char> PanelSides = new('╒', '═', '╕', '│', '┘', '─', '└', '│');
-    public static readonly SideCharacters<char> BoxSidesDouble = new('╔', '╗', '╝', '╚', '═', '║');
-    public static readonly SideCharacters<char> BoxSidesShadow = new('┌', '─', '╖', '║', '╝', '═', '╘', '│');
 
     public static readonly char[] Stars = new char[]
     {

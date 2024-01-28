@@ -18,7 +18,7 @@ public class Game
     #region Public Static Stuff
 
     public static Game Singleton => singleton!;
-    public static IRenderer<ConsoleChar> Renderer
+    public static Renderer<ConsoleChar> Renderer
     {
 #if SERVER
         [System.Diagnostics.CodeAnalysis.DoesNotReturn]
@@ -48,7 +48,7 @@ public class Game
     static Game? singleton;
 
 #if !SERVER
-    readonly IRenderer<ConsoleChar> renderer;
+    readonly Renderer<ConsoleChar> renderer;
 #endif
 
     ConnectionBase<PlayerInfo>? _connection;
@@ -93,7 +93,7 @@ public class Game
 
     public Game(
 #if !SERVER
-        IRenderer<ConsoleChar> _renderer
+        Renderer<ConsoleChar> _renderer
 #endif
         )
     {
@@ -205,7 +205,7 @@ public class Game
             }
             else
             {
-                renderer.ClearBuffer();
+                renderer.Clear();
             }
 #endif
 
@@ -333,8 +333,8 @@ public class Game
 
             TickConnectionMetrics();
 
-            renderer.Fill(_debugPanel.Rect, 0, ' ');
-            renderer.Panel(_debugPanel, _debugPanel.IsActive ? CharColor.BrightCyan : CharColor.White, in Ascii.PanelSides);
+            renderer.Fill(_debugPanel.Rect, ConsoleChar.Empty);
+            renderer.Panel(_debugPanel, _debugPanel.IsActive ? CharColor.BrightCyan : CharColor.White);
             ref SmallRect rect = ref _debugPanel.Rect;
 
             rect.Bottom = (short)(rect.Top + 1);

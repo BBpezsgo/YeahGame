@@ -16,7 +16,7 @@ public readonly struct TransparentImage
     {
         Vector2 transformedPoint = point / uv;
         transformedPoint *= new Vector2(Width, Height);
-        Coord imageCoord = new Coord((int)transformedPoint.X, (int)transformedPoint.Y);
+        Coord imageCoord = new((int)transformedPoint.X, (int)transformedPoint.Y);
         return this[imageCoord];
     }
 

@@ -64,7 +64,7 @@ public class MenuScene : Scene
         {
             SmallRect box = Layout.Center(new SmallSize(30, 6), new SmallRect(default, Game.Renderer.Size));
 
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White);
             box = box.Margin(1);
 
             Game.Renderer.Text(box.Left + Layout.Center(ExitReason, box.Width), box.Top + 1, ExitReason);
@@ -86,7 +86,7 @@ public class MenuScene : Scene
             };
 
             SmallRect box = Layout.Center(new SmallSize(Math.Max(30, text.Length + 5), 4), new SmallRect(default, Game.Renderer.Size));
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White);
             box = box.Margin(1);
 
             Game.Renderer.Text(box.Left + Layout.Center(text, box.Width), box.Top + 1, text);
@@ -103,15 +103,13 @@ public class MenuScene : Scene
 
                 Coord logoPos = default;
 
-                logoPos.X = (short)Layout.Center(LogoImage.Value.Width * 2, Game.Renderer.Width);
+                logoPos.X = (short)Layout.Center(LogoImage.Value.Width, Game.Renderer.Width);
                 logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - LogoImage.Value.Height);
 
-                Game.Renderer.Image(logoPos, LogoImage.Value, 2, 1);
-                // Game.Renderer.Image(logoPos, LogoImage);
-
+                Game.Renderer.Put(logoPos.X, logoPos.Y, LogoImage.Value.AsSpan(), LogoImage.Value.Width, LogoImage.Value.Height);
             }
 
-            Game.Renderer.Box(menuRect, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            Game.Renderer.Box(menuRect, CharColor.Black, CharColor.White);
             menuRect = menuRect.Margin(1, 2);
             menuRect.Right++;
             int y = 1;

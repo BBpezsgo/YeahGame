@@ -145,7 +145,7 @@ public class GameScene : Scene
             SmallRect box = Layout.Center(new SmallSize(50, infos.Count + 3 + (selfContained ? 0 : 1)), new SmallRect(default, Game.Renderer.Size));
 
             Game.Renderer.Clear(box);
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White);
             box = box.Margin(2);
 
             int y = 0;
@@ -183,8 +183,8 @@ public class GameScene : Scene
         {
             SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Size));
 
-            Game.Renderer.Fill(box, CharColor.Black, CharColor.Black, ' ');
-            Game.Renderer.Box(box, CharColor.Black, CharColor.White, in Ascii.BoxSides);
+            Game.Renderer.Fill(box, ConsoleChar.Empty);
+            Game.Renderer.Box(box, CharColor.Black, CharColor.White);
 
             ReadOnlySpan<char> text1 = "YOU DIED";
             Game.Renderer.Text(box.Left + Layout.Center(text1, box.Width - 2), box.Top + 2, text1, CharColor.BrightRed);
