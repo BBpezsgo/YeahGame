@@ -6,6 +6,50 @@ public class Program
 {
     static void Main(string[] args)
     {
+        // {
+        //     bool wasResized = false;
+        //     ConsoleListener.KeyEvent += Keyboard.Feed;
+        //     ConsoleListener.MouseEvent += Mouse.Feed;
+        //     ConsoleListener.WindowBufferSizeEvent += _ => wasResized = true;
+        // 
+        //     ConsoleHandler.Setup();
+        //     ConsoleListener.Start();
+        // 
+        //     ConsoleRenderer renderer = new();
+        // 
+        //     int imgw = 64;
+        //     int imgh = 64 / 2;
+        //     ConsoleChar[] img = new ConsoleChar[imgw * imgh];
+        //     for (int y = 0; y < imgh; y++)
+        //     {
+        //         for (int x = 0; x < imgw; x++)
+        //         {
+        //             img[x + (y * imgw)] = new ConsoleChar(' ', 0, CharColor.To4bitIRGB(System.Drawing.Color.FromArgb(x * 255 / imgw, y * 255 / imgh, 0)));
+        //         }
+        //     }
+        //     ConsoleImage image = new(img, imgw, imgh);
+        // 
+        //     while (true)
+        //     {
+        //         Keyboard.Tick();
+        //         Mouse.Tick();
+        // 
+        //         if (wasResized)
+        //         {
+        //             renderer.RefreshBufferSize();
+        //             wasResized = false;
+        //         }
+        //         else
+        //         {
+        //             renderer.ClearBuffer();
+        //         }
+        // 
+        //         renderer.Image(Mouse.RecordedConsolePosition - new Coord(image.Width + 4, (short)0), image);
+        //         renderer.Render();
+        //     }
+        //     ConsoleListener.Stop();
+        //     return;
+        // }
         // const int WindowWidth = 640;
         // const int WindowHeight = 480;
         // 
