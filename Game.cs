@@ -376,6 +376,9 @@ public class Game
         renderer.Text(rect.X + 1, rect.Bottom, $"State: {(Game.IsOffline ? "Offline" : _connection.State.ToString())}");
         rect.Bottom++;
 
+        if (_isOffline)
+        { return; }
+
         if (_connection.IsConnected)
         {
             if (!_connection.IsServer)

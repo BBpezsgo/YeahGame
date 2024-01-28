@@ -28,7 +28,8 @@ public class MenuScene : Scene
         },
     };
 
-    readonly ConsoleImage? LogoImage = null; // (ConsoleImage)Png.LoadFile(@"C:\Users\bazsi\Desktop\logo.png", (0, 0, 0));
+    const string LogoPath = @"C:\Users\bazsi\Desktop\logo.png";
+    readonly ConsoleImage? LogoImage = (OperatingSystem.IsBrowser() || !File.Exists(LogoPath)) ? null : ((ConsoleImage)Png.LoadFile(LogoPath, (0, 0, 0))).Scale(2, 1);
 
     public string? ExitReason;
 

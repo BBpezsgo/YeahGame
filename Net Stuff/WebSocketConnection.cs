@@ -154,7 +154,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
             switch (received.MessageType)
             {
                 case WebSocketMessageType.Text:
-                    Debug.WriteLine($"[WSS]: <= {wsRequest.RemoteEndPoint} == \"{Encoding.UTF8.GetString(buffer, 0, received.Count)}\"");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[WSS]: <= {wsRequest.RemoteEndPoint} == \"{Encoding.UTF8.GetString(buffer, 0, received.Count)}\"");
+                    }
                     break;
                 case WebSocketMessageType.Binary:
                     if (IsServer)
@@ -314,10 +317,16 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         switch (result.MessageType)
         {
             case WebSocketMessageType.Text:
-                Debug.WriteLine($"[WSS]: <= SERVER == \"{Encoding.UTF8.GetString(webSocketClientIncomingBuffer.ToArray(), 0, result.Count)}\"");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[WSS]: <= SERVER == \"{Encoding.UTF8.GetString(webSocketClientIncomingBuffer.ToArray(), 0, result.Count)}\"");
+                }
                 break;
             case WebSocketMessageType.Binary:
-                Debug.WriteLine($"[WSS]: <= SERVER == {result.Count} bytes");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[WSS]: <= SERVER == {result.Count} bytes");
+                }
                 OnReceiveInternal(webSocketClientIncomingBuffer.ToArray(), RemoteEndPoint ?? throw new NullReferenceException());
                 break;
             case WebSocketMessageType.Close:
@@ -342,7 +351,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
         if (IsServer)
         {
-            Debug.WriteLine($"[Net]: == ALL => {message}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == ALL => {message}");
+            }
             foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
             {
                 if (client.Value.Details.State != WebSocketState.Open) continue;
@@ -355,7 +367,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
                 {
-                    Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
+                    }
                     client.Value.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                 }
             }
@@ -364,14 +379,20 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         {
             message.Index = _sendingIndex++;
             byte[] data = Utils.Serialize(message);
-            Debug.WriteLine($"[Net]: == SERVER => {message}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == SERVER => {message}");
+            }
             Task task = webSocketClient.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, CancellationToken.None);
             task.Wait();
             _sentBytes += data.Length;
             if (message is ReliableMessage reliableMessage &&
                 reliableMessage.ShouldAck)
             {
-                Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                }
                 _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
             }
         }
@@ -386,7 +407,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
         if (IsServer)
         {
-            Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
+            }
             foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
             {
                 if (client.Value.Details.State != WebSocketState.Open) continue;
@@ -398,7 +422,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         }
         else if (webSocketClient is not null && webSocketClient.State == WebSocketState.Open)
         {
-            Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
+            }
             Task task = webSocketClient.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, CancellationToken.None);
             task.Wait();
             _sentBytes += data.Length;
@@ -418,7 +445,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
             {
                 if (client.Details.State != WebSocketState.Open) return;
 
-                Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
+                }
                 Task task = client.Details.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, CancellationToken.None);
                 task.Wait();
                 _sentBytes += data.Length;
@@ -429,7 +459,10 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
         {
             if (destination.Equals(RemoteEndPoint))
             {
-                Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
+                }
                 Task task = webSocketClient.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, CancellationToken.None);
                 task.Wait();
                 _sentBytes += data.Length;

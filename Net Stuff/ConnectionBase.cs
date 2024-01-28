@@ -363,8 +363,11 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         {
             case NetControlMessageKind.PING:
             {
-                Debug.WriteLine($"[Net]: <= {source} == Ping");
-                Debug.WriteLine($"[Net]: == {source} => Pong");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: <= {source} == Ping");
+                    Debug.WriteLine($"[Net]: == {source} => Pong");
+                }
                 SendImmediateTo(new NetControlMessage(NetControlMessageKind.PONG), source);
                 return;
             }
@@ -419,7 +422,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         ReliableMessageReceived _message = new(reader);
                         OnReceivingInternal(_message, source);
 
-                        Debug.WriteLine($"[Net]: <= {source} == ACK {_message.Index}");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[Net]: <= {source} == ACK {_message.Index}");
+                        }
 
                         if (IsServer)
                         {
@@ -459,7 +465,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         InfoResponseMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
 
-                        Debug.WriteLine($"[Net]: <= {source} == {_message}");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[Net]: <= {source} == {_message}");
+                        }
 
                         IPEndPoint? infoSource = _message.Source;
 
@@ -595,7 +604,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         HandshakeRequestMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
 
-                        Debug.WriteLine($"[Net]: <= {source} == Handshake Request");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[Net]: <= {source} == Handshake Request");
+                        }
 
                         SendImmediateTo(new HandshakeResponseMessage()
                         {
@@ -617,7 +629,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         HandshakeResponseMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
 
-                        Debug.WriteLine($"[Net]: <= {source} == Handshake Response (This is me: {_message.ThisIsYou})");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[Net]: <= {source} == Handshake Response (This is me: {_message.ThisIsYou})");
+                        }
 
                         Debug.WriteLine($"[Net]: Connected to {source} as {_message.ThisIsYou}");
 
@@ -630,7 +645,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     default: throw new NotImplementedException();
                 }
 
-                // Debug.WriteLine($"[Net]: <= {source} == {message}");
+                if (Utils.IsDebug)
+                {
+                    // Debug.WriteLine($"[Net]: <= {source} == {message}");
+                }
 
                 OnReceivingInternal(message, source);
 
@@ -672,7 +690,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
         if (client.ReceivingIndex != message.Index)
         {
-            Debug.WriteLine($"[Net]: Lost packet (expected {client.ReceivingIndex} got {message.Index})");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: Lost packet (expected {client.ReceivingIndex} got {message.Index})");
+            }
             _lostPackets++;
             client.ReceivingIndex = message.Index;
         }
@@ -735,7 +756,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
                 {
-                    Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                    }
                     _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                 }
                 byte[] data = Utils.Serialize(message);
@@ -777,7 +801,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
                 {
-                    Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
+                    }
                     destinationClient.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                 }
             }
@@ -788,7 +815,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
             if (message is ReliableMessage reliableMessage &&
                 reliableMessage.ShouldAck)
             {
-                Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                }
                 _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
             }
         }
@@ -813,7 +843,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     if (message is ReliableMessage reliableMessage &&
                         reliableMessage.ShouldAck)
                     {
-                        Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
+                        }
                         destinationClient.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                     }
                 }
@@ -824,7 +857,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
                 {
-                    Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                    }
                     _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                 }
             }

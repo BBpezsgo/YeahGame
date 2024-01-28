@@ -243,7 +243,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
         if (IsServer)
         {
-            Debug.WriteLine($"[Net]: == ALL => {message}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == ALL => {message}");
+            }
             foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
             {
                 message.Index = client.Value.SendingIndex++;
@@ -253,7 +256,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
                 {
-                    Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
+                    }
                     client.Value.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
                 }
             }
@@ -262,13 +268,19 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         {
             message.Index = _sendingIndex++;
             byte[] data = Utils.Serialize(message);
-            Debug.WriteLine($"[Net]: == SERVER => {message}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == SERVER => {message}");
+            }
             _client.Send(data, data.Length);
             _sentBytes += data.Length;
             if (message is ReliableMessage reliableMessage &&
                 reliableMessage.ShouldAck)
             {
-                Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
+                }
                 _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
             }
         }
@@ -285,7 +297,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
         if (IsServer)
         {
-            Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
+            }
             foreach (IPEndPoint client in _connections.Keys)
             {
                 _client.Send(data, data.Length, client);
@@ -294,7 +309,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         }
         else
         {
-            Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
+            }
             _client.Send(data, data.Length);
             _sentBytes += data.Length;
         }
@@ -313,7 +331,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         {
             if (_connections.TryGetValue(destination, out ConnectionClient? client))
             {
-                Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
+                }
                 _client.Send(data, data.Length, client.EndPoint);
                 _sentBytes += data.Length;
                 client.SentAt = Time.NowNoCache;
@@ -323,7 +344,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         {
             if (destination.Equals(RemoteEndPoint))
             {
-                Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
+                }
                 _client.Send(data, data.Length);
                 _sentBytes += data.Length;
             }

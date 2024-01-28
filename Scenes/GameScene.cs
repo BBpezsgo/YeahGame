@@ -445,7 +445,10 @@ public class GameScene : Scene
         foreach (NetworkEntity? entity in _networkEntities)
         {
             if (entity is null) continue;
-            Debug.WriteLine($"[NetEntity]: Sending object info for {entity.NetworkId} to {client} ...");
+            if (Utils.IsDebug)
+            {
+                Debug.WriteLine($"[NetEntity]: Sending object info for {entity.NetworkId} to {client} ...");
+            }
 
             byte[] details = Utils.Serialize(entity.NetworkSerialize);
             Game.Connection.SendTo(new ObjectControlMessage()
@@ -503,7 +506,10 @@ public class GameScene : Scene
                         ObjectId = objectMessage.ObjectId,
                         Kind = ObjectControlMessageKind.NotFound,
                     });
-                    Debug.WriteLine($"[NetEntity]: Object {objectMessage.ObjectId} not found ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[NetEntity]: Object {objectMessage.ObjectId} not found ...");
+                    }
                 }
             }
 
@@ -530,7 +536,10 @@ public class GameScene : Scene
                     }
 
                     AddEntity(GenerateNetworkEntity(objectControlMessage));
-                    Debug.WriteLine($"[NetEntity]: Spawning object {objectControlMessage.ObjectId} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[NetEntity]: Spawning object {objectControlMessage.ObjectId} ...");
+                    }
 
                     return;
                 }
@@ -538,7 +547,10 @@ public class GameScene : Scene
                 {
                     if (Game.IsServer) return;
 
-                    Debug.WriteLine($"[NetEntity]: Destroying object {objectControlMessage.ObjectId} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[NetEntity]: Destroying object {objectControlMessage.ObjectId} ...");
+                    }
 
                     for (int i = NetworkEntities.Count - 1; i >= 0; i--)
                     {
@@ -555,7 +567,10 @@ public class GameScene : Scene
 
                     if (TryGetNetworkEntity(objectControlMessage.ObjectId, out NetworkEntity? entity))
                     {
-                        Debug.WriteLine($"[NetEntity]: Sending object info for {objectControlMessage.ObjectId} to {source} ...");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[NetEntity]: Sending object info for {objectControlMessage.ObjectId} to {source} ...");
+                        }
 
                         byte[] details = Utils.Serialize(entity.NetworkSerialize);
                         Game.Connection.SendTo(new ObjectControlMessage()
@@ -568,7 +583,10 @@ public class GameScene : Scene
                     }
                     else
                     {
-                        Debug.WriteLine($"[NetEntity]: Sending object info for {objectControlMessage.ObjectId}: destroyed to {source} ...");
+                        if (Utils.IsDebug)
+                        {
+                            Debug.WriteLine($"[NetEntity]: Sending object info for {objectControlMessage.ObjectId}: destroyed to {source} ...");
+                        }
 
                         Game.Connection.SendTo(new ObjectControlMessage()
                         {
@@ -583,7 +601,10 @@ public class GameScene : Scene
                 {
                     if (Game.IsServer) return;
 
-                    Debug.WriteLine($"[NetEntity]: Received object info for {objectControlMessage.ObjectId} ...");
+                    if (Utils.IsDebug)
+                    {
+                        Debug.WriteLine($"[NetEntity]: Received object info for {objectControlMessage.ObjectId} ...");
+                    }
 
                     if (TryGetNetworkEntity(objectControlMessage.ObjectId, out NetworkEntity? entity))
                     {
@@ -632,7 +653,10 @@ public class GameScene : Scene
                     ObjectId = rpcMessage.ObjectId,
                     Kind = ObjectControlMessageKind.NotFound,
                 });
-                Debug.WriteLine($"[NetEntity]: Object {rpcMessage.ObjectId} not found ...");
+                if (Utils.IsDebug)
+                {
+                    Debug.WriteLine($"[NetEntity]: Object {rpcMessage.ObjectId} not found ...");
+                }
             }
             return;
         }
