@@ -47,6 +47,8 @@ public class GameScene : Scene
     readonly WeakList<NetworkEntity> _networkEntities = new();
     readonly List<Entity> _entities = new();
 
+    float highlightLocalPlayerTime = 0f;
+    const float LocalPlayerHighlightTime = .25f;
 
     public GameScene()
     {
@@ -179,7 +181,7 @@ public class GameScene : Scene
                 Game.Renderer.Text(box.Left, box.Top + y++, builder.ToString(), color);
             }
         }
-        else if (!TryGetLocalPlayer(out _) && Game.Connection.IsConnected)
+        else if (!TryGetLocalPlayer(out Player? localPlayer) && Game.Connection.IsConnected)
         {
             SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Size));
 
@@ -194,10 +196,26 @@ public class GameScene : Scene
         }
         else
         {
+            if (localPlayer is not null &&
+                Time.Now - highlightLocalPlayerTime < LocalPlayerHighlightTime)
+            {
+                float t = (Time.Now - highlightLocalPlayerTime) / LocalPlayerHighlightTime;
+                t = 1f - t;
+                int boxHeight = (int)(16 * t);
+                int boxWidth = boxHeight * 2;
+                Game.Renderer.Box(new SmallRect((int)MathF.Round(localPlayer.Position.X) - (boxWidth / 2), (int)MathF.Round(localPlayer.Position.Y) - (boxHeight / 2), boxWidth, boxHeight), CharColor.Black, CharColor.White, SideCharacters.BoxSides);
+            }
+
             if (Game.Connection.LocalUserInfo is not null)
             {
                 PlayerInfo info = Game.Connection.LocalUserInfo;
                 int y = Game.Renderer.Height - 2;
+
+                if (Game.Singleton.Joystick.Rect != default)
+                {
+                    y = Game.Singleton.Joystick.Rect.Top - 1;
+                }
+
                 for (int i = 0; i < info.Items.Value.Count; i++)
                 {
                     ItemType item = info.Items.Value[i];
@@ -286,6 +304,12 @@ public class GameScene : Scene
         else
         {
             LocalRespawnTimer = 0f;
+
+            if (Keyboard.IsKeyDown('Q') &&
+                !Chat.IsChatting)
+            {
+                highlightLocalPlayerTime = Time.Now;
+            }
         }
 
         {

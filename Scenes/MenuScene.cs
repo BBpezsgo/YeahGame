@@ -28,14 +28,22 @@ public class MenuScene : Scene
         },
     };
 
+    readonly ConsoleSelectBox<PlayerColor> PlayerColor = new(Enum.GetValues<PlayerColor>())
+    {
+        SelectedIndex = Biscuit.PlayerColor,
+    };
+
     const string LogoPath = @"C:\Users\bazsi\Desktop\logo.png";
     readonly ConsoleImage? LogoImage = (OperatingSystem.IsBrowser() || !File.Exists(LogoPath)) ? null : ((ConsoleImage)Png.LoadFile(LogoPath, (0, 0, 0))).Scale(2, 1);
 
     public string? ExitReason;
 
+    ConsoleSelectBoxStyle ColorSelectBoxStyle = new(Styles.SelectBoxStyle);
+
     public override void Load()
     {
         base.Load();
+
         InputSocket.Value = new System.Text.StringBuilder(Biscuit.Socket);
         InputName.Value = new System.Text.StringBuilder(Biscuit.Username);
         ConnectionType.SelectedIndex = Biscuit.ConnectionType switch
@@ -44,6 +52,8 @@ public class MenuScene : Scene
             ConnectionType_WebSocket => 1,
             _ => -1,
         };
+        PlayerColor.SelectedIndex = Biscuit.PlayerColor;
+
         Game.Connection = ConnectionType.SelectedItem switch
         {
             ConnectionType_UDP => new UdpConnection<PlayerInfo>(),
@@ -94,7 +104,7 @@ public class MenuScene : Scene
         }
         else
         {
-            SmallSize menuSize = new(30, 14);
+            SmallSize menuSize = new(30, 16);
 
             SmallRect menuRect = Layout.Center(menuSize, new SmallRect(default, Game.Renderer.Size));
 
@@ -131,6 +141,18 @@ public class MenuScene : Scene
                 Styles.InputFieldStyle,
                 InputName);
 
+            Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, "Color:");
+
+            ColorSelectBoxStyle.LabelNormal = CharColor.Make(CharColor.Black, (byte)((byte)PlayerColor.SelectedItem & 0b_0111));
+            ColorSelectBoxStyle.LabelHover = CharColor.Make(CharColor.Black, (byte)((byte)PlayerColor.SelectedItem | 0b_1000));
+            ColorSelectBoxStyle.LabelDown = CharColor.Make(CharColor.Black, (byte)((byte)PlayerColor.SelectedItem | 0b_1000));
+            ColorSelectBoxStyle.LabelActive = CharColor.Make(CharColor.Black, (byte)((byte)PlayerColor.SelectedItem | 0b_1000));
+
+            Game.Renderer.SelectBox(
+                new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1),
+                PlayerColor,
+                ColorSelectBoxStyle);
+
             y++;
 
             Game.Renderer.Text(menuRect.Left, menuRect.Top + y++, "Connection Type:");
@@ -161,6 +183,7 @@ public class MenuScene : Scene
                 Game.Connection.LocalUserInfo = new PlayerInfo()
                 {
                     Username = InputName.Value.ToString(),
+                    Color = PlayerColor.SelectedItem,
                 };
 
                 Biscuit.Username = InputName.Value.ToString();
@@ -181,6 +204,7 @@ public class MenuScene : Scene
                 Game.Connection.LocalUserInfo = new PlayerInfo()
                 {
                     Username = InputName.Value.ToString(),
+                    Color = PlayerColor.SelectedItem,
                 };
 
                 Game.IsOffline = false;
@@ -226,6 +250,7 @@ public class MenuScene : Scene
                     Game.Connection.LocalUserInfo = new PlayerInfo()
                     {
                         Username = InputName.Value.ToString(),
+                        Color = PlayerColor.SelectedItem,
                     };
 
                     Game.IsOffline = false;

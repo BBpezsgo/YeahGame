@@ -50,6 +50,20 @@ public class Biscuit
         }
     }
 
+    public static int PlayerColor
+    {
+        get
+        {
+            Biscuit.Load();
+            return _singleton._playerColor;
+        }
+        set
+        {
+            _singleton._playerColor = value;
+            Biscuit.Save();
+        }
+    }
+
     [JsonPropertyName("socket"), JsonRequired, JsonInclude]
     public string? _socket;
 
@@ -58,6 +72,9 @@ public class Biscuit
 
     [JsonPropertyName("connection_type"), JsonRequired, JsonInclude]
     public string? _connectionType;
+
+    [JsonPropertyName("player_color"), JsonRequired, JsonInclude]
+    public int _playerColor;
 
     const string FileName = "biscuit.json";
 

@@ -62,8 +62,11 @@ public class Chat
 
             if (_isChatting)
             {
-                result.Height += 1;
-                result.Width = Math.Max(result.Width, (short)(4 + 30));
+                result = result.Union(new SmallRect(1, Game.Renderer.Height - 2, InputFieldWidth, 1));
+            }
+            else if (Touch.IsTouchDevice)
+            {
+                result = result.Union(new SmallRect(1, Game.Renderer.Height - 2, 10, 1));
             }
 
             result = result.Margin(-1);
@@ -97,6 +100,15 @@ public class Chat
     int _scroll = 0;
 
     bool _isSending = false;
+
+    static short InputFieldWidth
+    {
+        get
+        {
+            if (Touch.IsTouchDevice) return 10;
+            return 30;
+        }
+    }
 
     void OnSent()
     {
@@ -201,9 +213,6 @@ public class Chat
             y--;
         }
 
-        if (_isSending)
-        { Game.Renderer.Text(2, Game.Renderer.Height - 3, "Sending ..."); }
-
         if (_isChatting)
         {
             if (Rect.Contains(Mouse.RecordedConsolePosition))
@@ -214,7 +223,30 @@ public class Chat
 
             _chatInput.IsActive = true;
             Game.Renderer.Text(2, Game.Renderer.Height - 2, ">");
-            Game.Renderer.InputField(new SmallRect(4, Game.Renderer.Height - 2, 30, 1), Styles.InputFieldStyle, _chatInput);
+            Game.Renderer.InputField(new SmallRect(4, Game.Renderer.Height - 2, InputFieldWidth, 1), Styles.InputFieldStyle, _chatInput);
+
+            if (Game.Renderer.Button(new SmallRect(2, Game.Renderer.Height - 3, 5, 1), "Send", Styles.ButtonStyle))
+            {
+                string msgContent = _chatInput.Value.ToString().Trim();
+                _chatInput.Clear();
+
+                Send(msgContent);
+
+                _isChatting = false;
+            }
+        }
+        else
+        {
+            if (_isSending)
+            { Game.Renderer.Text(2, Game.Renderer.Height - 3, "Sending ..."); }
+
+            if (Touch.IsTouchDevice)
+            {
+                if (Game.Renderer.Button(new SmallRect(1, Game.Renderer.Height - 2, 10, 1), "Open Chat", Styles.ButtonStyle))
+                {
+                    _isChatting = true;
+                }
+            }
         }
     }
 

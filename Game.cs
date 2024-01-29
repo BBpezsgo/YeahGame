@@ -359,7 +359,9 @@ public class Game
 
         if (Touch.IsTouchDevice)
         {
-            Joystick.Rect = new SmallRect(new Coord(1, Game.Renderer.Height - 6 - 1), new Coord(11, 6));
+            const short joystickWidth = 11;
+            const short joystickHeight = 6;
+            Joystick.Rect = new SmallRect(new Coord(Game.Renderer.Width - joystickWidth - 1, Game.Renderer.Height - joystickHeight - 1), new Coord(joystickWidth, joystickHeight));
             Joystick.Render(renderer);
         }
     }

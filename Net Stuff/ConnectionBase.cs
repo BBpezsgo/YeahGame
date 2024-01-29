@@ -629,6 +629,12 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         HandshakeResponseMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
 
+                        if (IsServer)
+                        {
+                            Debug.WriteLine($"[Net]: Server received a {MessageType.HandshakeResponse} message from {source} (wtf?)");
+                            return;
+                        }
+
                         if (Utils.IsDebug)
                         {
                             Debug.WriteLine($"[Net]: <= {source} == Handshake Response (This is me: {_message.ThisIsYou})");
@@ -638,6 +644,18 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
                         OnConnectedToServer_Invoke(ConnectingPhase.Handshake);
                         _thisIsMe = _message.ThisIsYou;
+
+                        if (LocalUserInfo is not null)
+                        {
+                            SendImmediate(new InfoResponseMessage()
+                            {
+                                ShouldAck = true,
+
+                                Details = Utils.Serialize(LocalUserInfo),
+                                IsServer = false,
+                                Source = _thisIsMe,
+                            });
+                        }
 
                         return;
                     }

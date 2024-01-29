@@ -154,15 +154,22 @@ public class Player : NetworkEntity
     public override void Render()
     {
         if (!Game.Renderer.IsVisible(Position)) return;
-        Game.Renderer[Position] = new ConsoleChar('○', IsLocalOwned ? CharColor.BrightMagenta : CharColor.White);
 
-        if (Owner is not null &&
-            Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance &&
-            Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) &&
-            info.Info != null)
+        byte color = CharColor.White;
+
+        bool hasInfo = Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info);
+
+        if (hasInfo && info.Info != null)
         {
-            Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username.Value);
+            color = (byte)info.Info.Color.Value;
+
+            if (Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance)
+            {
+                Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username.Value);
+            }
         }
+
+        Game.Renderer[Position] = new ConsoleChar('○', color);
     }
 
     #region Networking
