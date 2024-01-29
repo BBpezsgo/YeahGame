@@ -5,8 +5,8 @@ namespace YeahGame;
 
 public enum ItemType : byte
 {
-    Item1,
-    Item2,
+    RapidFire,
+    TeleportPrank,
 }
 
 public class Item : NetworkEntity
@@ -21,10 +21,10 @@ public class Item : NetworkEntity
 
         switch (Type)
         {
-            case ItemType.Item1:
-                Game.Renderer[Position] = new ConsoleChar('1', CharColor.White);
+            case ItemType.RapidFire:
+                Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
                 break;
-            case ItemType.Item2:
+            case ItemType.TeleportPrank:
                 Game.Renderer[Position] = new ConsoleChar('2', CharColor.White);
                 break;
             default:

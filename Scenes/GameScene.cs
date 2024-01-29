@@ -78,7 +78,7 @@ public class GameScene : Scene
                 {
                     NetworkId = GenerateNetworkId(),
                     Position = position,
-                    Type = ItemType.Item1,
+                    Type = ItemType.RapidFire,
                 });
             }
 

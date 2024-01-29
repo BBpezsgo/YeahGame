@@ -18,6 +18,7 @@ public class Player : NetworkEntity
     public float HP = 1;
     public IPEndPoint? Owner;
     float LastShot = Time.Now;
+    float GetPowerUpTime = 0;
 
     Vector2 NetPosition;
     float LastNetPositionTime;
@@ -65,6 +66,26 @@ public class Player : NetworkEntity
                 velocity.Y *= .5f;
                 Position += velocity * (Speed * Time.Delta);
             }
+
+            if (Keyboard.IsKeyDown('E') && 
+                Game.Connection.TryGetUserInfo(Owner, out var info) && 
+                info.Info is not null &&
+                info.Info.Items.Value.Count > 0)
+            {
+                ItemType item = info.Info.Items.Value[0];
+                info.Info.Items.Value.RemoveAt(0);
+                info.Info.Items.WasChanged = true;
+                switch (item)
+                {
+                    case ItemType.RapidFire:
+                        GetPowerUpTime = Time.Now;
+                        break;
+                    case ItemType.TeleportPrank:
+                        break;
+                    default:
+                        break;
+                }
+            }
         }
 
 #if !SERVER
@@ -93,7 +114,7 @@ public class Player : NetworkEntity
             shootPosition = Mouse.RecordedConsolePosition;
         }
 
-        if (Time.Now - LastShot >= ReloadTime && shouldShoot)
+        if (Time.Now - LastShot >= GetCurrentReloadTime() && shouldShoot)
         {
             Vector2 velocity = shootPosition - Position;
             velocity *= new Vector2(1f, 2f);
@@ -170,6 +191,16 @@ public class Player : NetworkEntity
         }
 
         Game.Renderer[Position] = new ConsoleChar('○', color);
+    }
+
+    float GetCurrentReloadTime()
+    {
+        if (Time.Now - GetPowerUpTime < 5)
+        {
+            return .1f;
+        }
+
+        return ReloadTime;
     }
 
     #region Networking
