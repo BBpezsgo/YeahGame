@@ -178,7 +178,7 @@ public class Player : NetworkEntity
         }
     }
 
-    public override void SyncDown(ObjectSyncMessage message, System.Net.IPEndPoint source)
+    public override void SyncDown(ObjectSyncMessage message, IPEndPoint source)
     {
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);

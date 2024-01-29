@@ -191,7 +191,6 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         base.Close();
 
         _shouldListen = false;
-        _client?.Close();
         _client?.Dispose();
         _client = null;
 

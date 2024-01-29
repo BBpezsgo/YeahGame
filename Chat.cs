@@ -93,7 +93,7 @@ public class Chat
         // new Message((true, null), (float)Time.NowNoCache, "p"),
     };
     bool _isChatting = false;
-    readonly ConsoleInputField _chatInput = new(null) { NeverLoseFocus = true };
+    readonly ConsoleInputField _chatInput = new(null) { NeverLoseFocus = true, Label = "Chat" };
     int _scroll = 0;
 
     bool _isSending = false;

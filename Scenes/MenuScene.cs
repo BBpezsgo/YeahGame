@@ -10,10 +10,10 @@ public class MenuScene : Scene
 {
     public override string Name => "Menu";
 
-    readonly ConsoleInputField InputSocket = new(Biscuit.Socket);
+    readonly ConsoleInputField InputSocket = new(Biscuit.Socket) { Label = "Socket" };
     string? InputSocketError = null;
 
-    readonly ConsoleInputField InputName = new(Biscuit.Username);
+    readonly ConsoleInputField InputName = new(Biscuit.Username) { Label = "Username" };
 
     const string ConnectionType_UDP = "UDP";
     const string ConnectionType_WebSocket = "WebSocket";

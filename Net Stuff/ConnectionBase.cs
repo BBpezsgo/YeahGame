@@ -38,7 +38,7 @@ public readonly struct ConnectionUserInfo<TUserInfo>
     }
 }
 
-public class ConnectionBase
+public static class ConnectionBase
 {
     public delegate void ClientConnectedEventHandler(IPEndPoint client, ConnectingPhase phase);
     public delegate void ClientDisconnectedEventHandler(IPEndPoint client);
