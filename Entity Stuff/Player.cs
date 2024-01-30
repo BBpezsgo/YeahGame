@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Win32.Gdi32;
 using YeahGame.Messages;
 
 namespace YeahGame;
@@ -23,6 +24,15 @@ public class Player : NetworkEntity
     Vector2 NetPosition;
     float LastNetPositionTime;
     CapturedTouch? CapturedTouch;
+
+    public byte Color => PlayerInfo is null ? CharColor.White : (byte)PlayerInfo.Color.Value;
+
+    public PlayerInfo? PlayerInfo => Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) ? info.Info : null;
+
+    public Player()
+    {
+        IsSolid = true;
+    }
 
     public override void Update()
     {
@@ -67,8 +77,8 @@ public class Player : NetworkEntity
                 Position += velocity * (Speed * Time.Delta);
             }
 
-            if (Keyboard.IsKeyDown('E') && 
-                Game.Connection.TryGetUserInfo(Owner, out var info) && 
+            if (Keyboard.IsKeyDown('E') &&
+                Game.Connection.TryGetUserInfo(Owner, out var info) &&
                 info.Info is not null &&
                 info.Info.Items.Value.Count > 0)
             {
@@ -133,6 +143,11 @@ public class Player : NetworkEntity
 
             if (Game.IsServer || Game.IsOffline)
             {
+                Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity))
+                {
+                    Position = Position,
+                });
+
                 velocity *= Projectile.Speed;
                 velocity *= new Vector2(1, 0.5f);
 
@@ -178,19 +193,29 @@ public class Player : NetworkEntity
 
         byte color = CharColor.White;
 
-        bool hasInfo = Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info);
+        PlayerInfo? info = PlayerInfo;
 
-        if (hasInfo && info.Info != null)
+        if (info is not null)
         {
-            color = (byte)info.Info.Color.Value;
+            color = (byte)info.Color.Value;
 
             if (Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance)
             {
-                Game.Renderer.Text(Position + new Vector2(0, 1), info.Info.Username.Value);
+                Game.Renderer.Text(Position + new Vector2(0, 1), info.Username.Value);
             }
         }
 
         Game.Renderer[Position] = new ConsoleChar('○', color);
+    }
+
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+
+        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetDeath(CharColor.GetColor(Color)))
+        {
+            Position = Position,
+        });
     }
 
     float GetCurrentReloadTime()

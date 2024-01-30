@@ -255,20 +255,23 @@ public class MenuScene : Scene
 
                     Game.IsOffline = false;
 
+                    Biscuit.Socket = InputSocket.Value.ToString();
+                    Biscuit.Username = InputName.Value.ToString();
+                    Biscuit.ConnectionType = ConnectionType.SelectedItem;
+
                     if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                     {
                         try
                         {
                             Game.Connection.StartHost(endPoint);
-
-                            Biscuit.Socket = InputSocket.Value.ToString();
-                            Biscuit.Username = InputName.Value.ToString();
-                            Biscuit.ConnectionType = ConnectionType.SelectedItem;
                         }
                         catch (SocketException socketException)
                         { InputSocketError = socketException.SocketErrorCode.ToString(); }
                         catch (Exception exception)
-                        { InputSocketError = exception.Message; }
+                        {
+                            InputSocketError = exception.Message;
+                            throw;
+                        }
                     }
                     else
                     { InputSocketError = error; }

@@ -4,6 +4,9 @@ namespace YeahGame;
 
 public static partial class Utils
 {
+    public const float Deg2Rad = MathF.PI / 180f;
+    public const float Rad2Deg = 180f / MathF.PI;
+
     public const bool IsDebug =
 #if DEBUG
         true;

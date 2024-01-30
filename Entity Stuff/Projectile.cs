@@ -12,6 +12,7 @@ public class Projectile : Entity
 
     public Projectile(Entity owner)
     {
+        IsSolid = false;
         Owner = owner;
     }
 
@@ -58,16 +59,28 @@ public class Projectile : Entity
         foreach (Entity entity in Game.Singleton.GameScene.Entities)
         {
             if (entity == Owner) continue;
-            if (entity is Projectile) continue;
+            if (!entity.IsSolid) continue;
 
             Vector2 p = Utils.Point2LineDistance(lastPos, Position, entity.Position);
-            if (Vector2.Distance(p, entity.Position) < 1f && Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) < deltaPos.Length())
+            if (Vector2.Distance(p, entity.Position) <= 1.5f &&
+                Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) <= MathF.Max(1f, deltaPos.Length()))
             {
                 if (entity is Player player) player.Damage(Damage);
+                if (entity is Tester tester) tester.Damage(Damage);
 
                 DoesExist = false;
                 return;
             }
         }
+    }
+
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+
+        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetImpact(-Vector2.Normalize(Velocity)))
+        {
+            Position = Position,
+        });
     }
 }

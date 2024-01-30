@@ -62,6 +62,12 @@ public class GameScene : Scene
 
         if (Game.IsServer || Game.IsOffline)
         {
+            SpawnEntity(new Tester()
+            {
+                NetworkId = GenerateNetworkId(),
+                Position = GetSpawnPoint(),
+            });
+
             SpawnEntity(new Player()
             {
                 Owner = Game.Connection.LocalEndPoint,
@@ -357,7 +363,12 @@ public class GameScene : Scene
         if (entity is NetworkEntity networkEntity)
         { _networkEntities.Remove(networkEntity); }
 
-        return _entities.Remove(entity);
+        if (_entities.Remove(entity))
+        {
+            entity.OnDestroy();
+            return true;
+        }
+        return false;
     }
 
     public void SpawnEntity(Entity entity)

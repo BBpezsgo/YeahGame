@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Versioning;
+using Win32.Gdi32;
 
 namespace YeahGame;
 
@@ -56,18 +57,19 @@ public class Program
         // const int RenderWidth = WindowWidth / 2;
         // const int RenderHeight = WindowHeight / 2;
         // 
-        // Image font = Image.LoadFile("font.png", 0).Value;
+        // Image fontImage = Image.LoadFile(@"C:\Users\bazsi\Desktop\Unity Stuff\Computer (removed from Nothing3D project)\Font3.png", default).Value;
+        // BitmapFont<uint> font = BitmapFont.FromAny<ValueTuple<byte, byte, byte>, uint>(fontImage.Data.AsSpan(), fontImage.Width, fontImage.Height, 8, 8, v => GdiColor.Make(v.Item1, v.Item2, v.Item3));
         // 
-        // using Renderer renderer = new(RenderWidth, RenderHeight, WindowWidth, WindowHeight);
+        // using WindowRenderer renderer = new(RenderWidth, RenderHeight, WindowWidth, WindowHeight);
         // 
         // bool done = false;
         // while (!done && renderer.Tick())
         // {
         //     Time.Tick();
         // 
-        //     done |= Win32.LowLevel.User32.GetAsyncKeyState(Win32.LowLevel.VirtualKeyCode.ESCAPE) != 0;
+        //     done |= Win32.LowLevel.User32.GetAsyncKeyState((int)Win32.LowLevel.VirtualKeyCode.ESCAPE) != 0;
         // 
-        //     renderer.DrawString(0, 0, "Hello", font);
+        //     renderer.Text(0, 0, "Hello", font);
         // 
         //     // for (int x = 0; x < renderer.Width; x++)
         //     // {
@@ -79,8 +81,10 @@ public class Program
         // 
         //     renderer.Render();
         // 
-        //     Debug.WriteLine($"{(int)(1f / Time.Delta)}");
+        //     System.Diagnostics.Debug.WriteLine($"{(int)(1f / Time.Delta)}");
         // }
+        // 
+        // return;
 
 #if SERVER
         System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.ConsoleTraceListener(false));

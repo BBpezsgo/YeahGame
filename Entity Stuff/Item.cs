@@ -15,6 +15,11 @@ public class Item : NetworkEntity
 
     public override EntityPrototype Prototype => EntityPrototype.Item;
 
+    public Item()
+    {
+        IsSolid = false;
+    }
+
     public override void Render()
     {
         if (!Game.Renderer.IsVisible(Position)) return;
