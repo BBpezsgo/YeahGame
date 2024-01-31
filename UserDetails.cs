@@ -10,7 +10,7 @@ public enum PlayerColor : byte
     Yellow = CharColor.BrightYellow,
 }
 
-public class PlayerInfo : ISerializable
+public class UserDetails : ISerializable
 {
     public Changed<string> Username;
     public Changed<PlayerColor> Color = PlayerColor.Magenta;

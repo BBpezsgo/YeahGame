@@ -1,14 +1,103 @@
-﻿using System.Collections.Concurrent;
+﻿/*   === Connection ===
+ *  
+ *  Client              Server
+ *  
+ *  1. Establish connection (depends on the underlying protocol)
+ *  2.
+ *      Handshake Request
+ *     ----------------->>
+ *     
+ *                          - Stores the client's address
+ *                          - Sends back the address
+ *  3.
+ *      Handshake Response
+ *     <<-----------------
+ *  
+ *  - Stores the address
+ *  
+ *  
+ *  If someone idling more than 5 seconds, it sends a PING message to that EndPoint.
+ *  If someone idling more than 10 seconds, it considered as disconnected.
+ *  
+ */
+
+/*   === Reliable Messages ===
+ *  
+ *  EndPoint A              EndPoint B
+ *  
+ *  - Saves the message's
+ *    id (and the payload)
+ *    to a list
+ *  
+ *  CASE 1
+ *  
+ *   Any message that inherits
+ *    from `ReliableMessage`
+ *     ----------------->>
+ *  
+ *                          - Responses with a `ReliableMessageReceived`
+ *                            message containing the incoming message's id
+ *  
+ *   ReliableMessageReceived
+ *     <<-----------------
+ *  
+ *  - Removes the stored message id
+ *    (and the payload) from the list
+ *  - Message successfully received by
+ *    the remote EndPoint
+ *  
+ *  
+ *  CASE 2
+ *  
+ *   Any message that inherits
+ *    from `ReliableMessage`
+ *     ----------------->>
+ *  
+ *         NETWORK ERROR
+ *                          - Didn't received anything
+ *  
+ *  - Loops through all the
+ *    sent messages:
+ *    If the message sent
+ *    more than 1 second
+ *    ago, it sends it again
+ *    and updates the message's id
+ *  
+ */
+
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using YeahGame.Messages;
 
-using RawMessage = (System.ReadOnlyMemory<byte> Buffer, System.Net.IPEndPoint Source);
-using SentReliableMessage = (YeahGame.Messages.ReliableMessage Message, float SentTime);
-
 namespace YeahGame;
+
+public readonly struct RawMessage
+{
+    public readonly ReadOnlyMemory<byte> Buffer;
+    public readonly IPEndPoint Source;
+
+    public RawMessage(ReadOnlyMemory<byte> buffer, IPEndPoint source)
+    {
+        Buffer = buffer;
+        Source = source;
+    }
+}
+
+public readonly struct SentReliableMessage
+{
+    public readonly ReliableMessage Message;
+    public readonly float SentTime;
+
+    SentReliableMessage(ReliableMessage message, float sentTime)
+    {
+        Message = message;
+        SentTime = sentTime;
+    }
+
+    public static SentReliableMessage From(ReliableMessage message) => new(message.Copy(), (float)Time.NowNoCache);
+}
 
 public enum ConnectingPhase
 {
@@ -24,51 +113,48 @@ public enum ConnectionState
     Connected,
 }
 
-public readonly struct ConnectionUserInfo<TUserInfo>
+public readonly struct ConnectionUserDetails
 {
-    public readonly TUserInfo? Info;
+    public readonly UserDetails? Details;
     public readonly bool IsServer;
     public readonly bool IsRefreshing;
 
-    public ConnectionUserInfo(TUserInfo? info, bool isServer, bool isRefreshing)
+    public ConnectionUserDetails(UserDetails? info, bool isServer, bool isRefreshing)
     {
-        Info = info;
+        Details = info;
         IsServer = isServer;
         IsRefreshing = isRefreshing;
     }
 }
 
-public static class ConnectionBase
+public abstract class Connection
 {
     public delegate void ClientConnectedEventHandler(IPEndPoint client, ConnectingPhase phase);
     public delegate void ClientDisconnectedEventHandler(IPEndPoint client);
     public delegate void ConnectedToServerEventHandler(ConnectingPhase phase);
     public delegate void DisconnectedFromServerEventHandler();
     public delegate void MessageReceivedEventHandler(Message message, IPEndPoint source);
-}
 
-public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> where TUserInfo : ISerializable
-{
     protected class ConnectionUserInfoPrivate
     {
         const float MaxAge = 5f;
         const float MinRequestInterval = 1f;
 
-        public readonly TUserInfo? Info;
+        public readonly UserDetails? Info;
         public readonly bool IsServer;
         public readonly float ReceivedAt;
         public float RequestedAt;
 
         public bool ShouldRequest => ((float)Time.NowNoCache - ReceivedAt > MaxAge) && ((float)Time.Now - RequestedAt > MinRequestInterval);
 
-        public ConnectionUserInfoPrivate(TUserInfo? info, bool isServer, float refreshedAt)
+        public ConnectionUserInfoPrivate(UserDetails? info, bool isServer, float refreshedAt)
         {
             Info = info;
             IsServer = isServer;
             ReceivedAt = refreshedAt;
         }
 
-        public static explicit operator ConnectionUserInfo<TUserInfo>(ConnectionUserInfoPrivate v) => new(
+        public static explicit operator ConnectionUserDetails(ConnectionUserInfoPrivate v) => new(
             v.Info,
             v.IsServer,
             v.ReceivedAt < v.RequestedAt);
@@ -76,16 +162,15 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         public static ConnectionUserInfoPrivate GetLoadingInstance(bool isServer) => new(default, isServer, 0f);
     }
 
-    public event ConnectionBase.ClientConnectedEventHandler? OnClientConnected;
-    public event ConnectionBase.ClientDisconnectedEventHandler? OnClientDisconnected;
-    public event ConnectionBase.ConnectedToServerEventHandler? OnConnectedToServer;
-    public event ConnectionBase.DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
-    public event ConnectionBase.MessageReceivedEventHandler? OnMessageReceived;
+    public event ClientConnectedEventHandler? OnClientConnected;
+    public event ClientDisconnectedEventHandler? OnClientDisconnected;
+    public event ConnectedToServerEventHandler? OnConnectedToServer;
+    public event DisconnectedFromServerEventHandler? OnDisconnectedFromServer;
+    public event MessageReceivedEventHandler? OnMessageReceived;
 
     protected void OnClientConnected_Invoke(IPEndPoint client, ConnectingPhase phase) => OnClientConnected?.Invoke(client, phase);
     protected void OnClientDisconnected_Invoke(IPEndPoint client) => OnClientDisconnected?.Invoke(client);
     protected void OnConnectedToServer_Invoke(ConnectingPhase phase) => OnConnectedToServer?.Invoke(phase);
-    protected void OnDisconnectedFromServer_Invoke() => OnDisconnectedFromServer?.Invoke();
     protected void OnMessageReceived_Invoke(Message message, IPEndPoint source) => OnMessageReceived?.Invoke(message, source);
 
     #region Constants
@@ -100,11 +185,11 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
     #region Properties
 
-    public TUserInfo? LocalUserInfo;
+    public UserDetails? LocalUserInfo;
 
     public abstract ICollection<IPEndPoint> Connections { get; }
 
-    public IReadOnlyDictionary<IPEndPoint, ConnectionUserInfo<TUserInfo>> UserInfos => _userInfos.Select(v => new KeyValuePair<IPEndPoint, ConnectionUserInfo<TUserInfo>>(v.Key, (ConnectionUserInfo<TUserInfo>)v.Value)).ToFrozenDictionary();
+    public IReadOnlyDictionary<IPEndPoint, ConnectionUserDetails> UserInfos => _userInfos.Select(v => new KeyValuePair<IPEndPoint, ConnectionUserDetails>(v.Key, (ConnectionUserDetails)v.Value)).ToFrozenDictionary();
 
     public abstract IPEndPoint? RemoteEndPoint { get; }
 
@@ -177,6 +262,11 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         _outgoingQueue.Clear();
 
         _userInfos.Clear();
+
+        Debug.WriteLine($"[Net]: Closed");
+
+        if (!IsServer)
+        { OnDisconnectedFromServer?.Invoke(); }
     }
 
     public abstract void Tick();
@@ -197,10 +287,10 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
     #region User Info
 
-    public bool TryGetUserInfo(string? owner, out ConnectionUserInfo<TUserInfo> userInfo)
+    public bool TryGetUserInfo(string? owner, out ConnectionUserDetails userInfo)
         => TryGetUserInfo(owner is null ? null : IPEndPoint.Parse(owner), out userInfo);
 
-    public bool TryGetUserInfo(IPEndPoint? owner, out ConnectionUserInfo<TUserInfo> info)
+    public bool TryGetUserInfo(IPEndPoint? owner, out ConnectionUserDetails info)
     {
         if (owner is null)
         {
@@ -210,14 +300,14 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
         if (_userInfos.TryGetValue(owner, out ConnectionUserInfoPrivate? _info))
         {
-            info = (ConnectionUserInfo<TUserInfo>)_info;
+            info = (ConnectionUserDetails)_info;
             return true;
         }
 
         if (owner.Equals(LocalEndPoint) &&
             LocalUserInfo != null)
         {
-            info = new ConnectionUserInfo<TUserInfo>(LocalUserInfo, IsServer, false);
+            info = new ConnectionUserDetails(LocalUserInfo, IsServer, false);
             return true;
         }
 
@@ -228,9 +318,9 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     #endregion
 }
 
-public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo, TClientDetails> : ConnectionBase<TUserInfo> where TUserInfo : ISerializable
+public abstract class Connection<TClientDetails> : Connection
 {
-    protected class ConnectionClient
+    protected class Client
     {
         public readonly ConcurrentQueue<byte[]> IncomingQueue;
         public readonly List<Message> OutgoingQueue;
@@ -247,7 +337,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
         public TClientDetails Details;
 
-        public ConnectionClient(IPEndPoint endPoint, TClientDetails details)
+        public Client(IPEndPoint endPoint, TClientDetails details)
         {
             IncomingQueue = new ConcurrentQueue<byte[]>();
             OutgoingQueue = new List<Message>();
@@ -262,17 +352,9 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         }
     }
 
-    #region Properties
-
     public override ICollection<IPEndPoint> Connections => _connections.Keys;
 
-    #endregion
-
-    #region Fields
-
-    protected readonly ConcurrentDictionary<IPEndPoint, ConnectionClient> _connections = new();
-
-    #endregion
+    protected readonly ConcurrentDictionary<IPEndPoint, Client> _connections = new();
 
     public override void Close()
     {
@@ -285,7 +367,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     {
         _connectionRemovals.Clear();
 
-        foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+        foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
         {
             SendImmediateTo(client.Value.OutgoingQueue, client.Value.EndPoint);
             client.Value.OutgoingQueue.Clear();
@@ -325,7 +407,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
         {
             _userInfos.Remove(_connectionRemovals[i]);
 
-            if (_connections.TryRemove(_connectionRemovals[i], out ConnectionClient? removedClient))
+            if (_connections.TryRemove(_connectionRemovals[i], out Client? removedClient))
             { OnClientDisconnected_Invoke(removedClient.EndPoint); }
         }
     }
@@ -350,7 +432,8 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
             SendImmediate(new NetControlMessage(NetControlMessageKind.PING));
         }
 
-        if (Time.NowNoCache - _receivedAt >= Timeout && IsConnected)
+        if (Time.NowNoCache - _receivedAt >= Timeout &&
+            IsConnected)
         {
             Debug.WriteLine($"[Net]: Server idling more than {Timeout} seconds, disconnecting ...");
             Close();
@@ -429,7 +512,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
                         if (IsServer)
                         {
-                            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+                            foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
                             {
                                 client.Value.SentReliableMessages.Remove(_message.AckIndex, out SentReliableMessage removed);
                                 removed.Message?.Callback?.Invoke();
@@ -484,7 +567,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         }
                         else
                         {
-                            TUserInfo data = Utils.Deserialize<TUserInfo>(_message.Details);
+                            UserDetails data = Utils.Deserialize<UserDetails>(_message.Details);
                             if (!IsServer)
                             {
                                 if (infoSource.Equals(LocalEndPoint))
@@ -558,43 +641,9 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
 
                                 return;
                             }
-
-                            foreach ((IPEndPoint key, ConnectionUserInfoPrivate value) in _userInfos)
-                            {
-                                if (value.Info is null)
-                                { continue; }
-
-                                SendTo(new InfoResponseMessage()
-                                {
-                                    IsServer = false,
-                                    Source = key,
-                                    Details = Utils.Serialize(value.Info),
-                                }, source);
-                            }
-#if !SERVER
-                            if (LocalUserInfo is not null)
-                            {
-                                SendTo(new InfoResponseMessage()
-                                {
-                                    IsServer = true,
-                                    Source = null,
-                                    Details = Utils.Serialize(LocalUserInfo),
-                                }, source);
-                            }
-#endif
                         }
-                        else
-                        {
-                            if (LocalUserInfo is null)
-                            { return; }
 
-                            SendTo(new InfoResponseMessage()
-                            {
-                                IsServer = false,
-                                Source = null,
-                                Details = Utils.Serialize(LocalUserInfo),
-                            }, source);
-                        }
+                        SendAllUserDetailsTo(source, false);
 
                         return;
                     }
@@ -603,6 +652,12 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     {
                         HandshakeRequestMessage _message = new(reader);
                         OnReceivingInternal(_message, source);
+
+                        if (!IsServer)
+                        {
+                            Debug.WriteLine($"[Net]: Received a handshake request from {source} but I'm a client");
+                            return;
+                        }
 
                         if (Utils.IsDebug)
                         {
@@ -614,12 +669,14 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                             ThisIsYou = source,
                         }, source);
 
-                        if (_connections.TryGetValue(source, out ConnectionClient? client) &&
+                        if (_connections.TryGetValue(source, out Client? client) &&
                             !client.ShookHands)
                         {
                             client.ShookHands = true;
                             Debug.WriteLine($"[Net]: Shook hands with client {source}");
                             OnClientConnected_Invoke(source, ConnectingPhase.Handshake);
+
+                            SendAllUserDetailsTo(source, false);
                         }
 
                         return;
@@ -701,7 +758,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
             }
         }
 
-        if (!_connections.TryGetValue(source, out ConnectionClient? client))
+        if (!_connections.TryGetValue(source, out Client? client))
         { return; }
 
         client.ReceivingIndex++;
@@ -725,7 +782,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     {
         if (IsServer)
         {
-            if (_connections.TryGetValue(destination, out ConnectionClient? client))
+            if (_connections.TryGetValue(destination, out Client? client))
             { client.OutgoingQueue.Add(message); }
         }
         else
@@ -739,7 +796,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     {
         if (IsServer)
         {
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+            foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
             {
                 if (client.Value.EndPoint.Equals(expect)) continue;
                 client.Value.OutgoingQueue.Add(message);
@@ -778,7 +835,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     {
                         Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
                     }
-                    _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                    _sentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                 }
                 byte[] data = Utils.Serialize(message);
 
@@ -813,7 +870,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     {
         if (IsServer)
         {
-            if (_connections.TryGetValue(destination, out ConnectionClient? destinationClient))
+            if (_connections.TryGetValue(destination, out Client? destinationClient))
             {
                 message.Index = destinationClient.SendingIndex++;
                 if (message is ReliableMessage reliableMessage &&
@@ -823,7 +880,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     {
                         Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
                     }
-                    destinationClient.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                    destinationClient.SentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                 }
             }
         }
@@ -837,7 +894,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                 {
                     Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
                 }
-                _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                _sentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
             }
         }
 
@@ -849,7 +906,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
     {
         _jointData.Clear();
         _jointMessages.Clear();
-        _connections.TryGetValue(destination, out ConnectionClient? destinationClient);
+        _connections.TryGetValue(destination, out Client? destinationClient);
 
         foreach (Message message in messages)
         {
@@ -865,7 +922,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                         {
                             Debug.WriteLine($"[Net]: == {destination} => Waiting ACK for {message.Index} ...");
                         }
-                        destinationClient.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                        destinationClient.SentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                     }
                 }
             }
@@ -879,7 +936,7 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                     {
                         Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
                     }
-                    _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                    _sentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                 }
             }
 
@@ -926,6 +983,55 @@ public abstract class ConnectionBase<[DynamicallyAccessedMembers(DynamicallyAcce
                 }, userInfo.Key);
                 userInfo.Value.RequestedAt = (float)Time.NowNoCache;
             }
+        }
+    }
+
+    protected void SendAllUserDetailsTo(IPEndPoint destination, bool shouldAck)
+    {
+        if (IsServer)
+        {
+            foreach ((IPEndPoint key, ConnectionUserInfoPrivate value) in _userInfos)
+            {
+                if (value.Info is null)
+                { continue; }
+
+                SendTo(new InfoResponseMessage()
+                {
+                    ShouldAck = shouldAck,
+
+                    IsServer = false,
+                    Source = key,
+                    Details = Utils.Serialize(value.Info),
+                }, destination);
+            }
+
+#if !SERVER
+            if (LocalUserInfo is not null)
+            {
+                SendTo(new InfoResponseMessage()
+                {
+                    ShouldAck = shouldAck,
+
+                    IsServer = true,
+                    Source = null,
+                    Details = Utils.Serialize(LocalUserInfo),
+                }, destination);
+            }
+#endif
+        }
+        else
+        {
+            if (LocalUserInfo is null)
+            { return; }
+
+            SendTo(new InfoResponseMessage()
+            {
+                ShouldAck = shouldAck,
+
+                IsServer = false,
+                Source = null,
+                Details = Utils.Serialize(LocalUserInfo),
+            }, destination);
         }
     }
 

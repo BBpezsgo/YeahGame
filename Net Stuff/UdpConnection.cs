@@ -5,12 +5,10 @@ using System.Net.Sockets;
 using System.Runtime.Versioning;
 using YeahGame.Messages;
 
-using RawMessage = (System.ReadOnlyMemory<byte> Buffer, System.Net.IPEndPoint Source);
-
 namespace YeahGame;
 
 [UnsupportedOSPlatform("browser")]
-public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> : ConnectionBase<TUserInfo, object?> where TUserInfo : ISerializable
+public class UdpConnection : Connection<object?>
 {
     #region Public Properties
 
@@ -18,10 +16,10 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
     {
         get
         {
-            if (_client is null || _isServer) return null;
+            if (_udpClient is null || _isServer) return null;
 
             try
-            { return (IPEndPoint?)_client.Client.RemoteEndPoint; }
+            { return (IPEndPoint?)_udpClient.Client.RemoteEndPoint; }
             catch (ObjectDisposedException)
             { return null; }
         }
@@ -33,12 +31,12 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         {
             if (Game.IsOffline) return base.LocalEndPoint;
 
-            if (_client is null) return null;
+            if (_udpClient is null) return null;
 
             if (_isServer)
             {
                 try
-                { return (IPEndPoint?)_client.Client.LocalEndPoint; }
+                { return (IPEndPoint?)_udpClient.Client.LocalEndPoint; }
                 catch (ObjectDisposedException)
                 { return null; }
             }
@@ -55,8 +53,8 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
     {
         get
         {
-            if (_client is null) return ConnectionState.None;
-            if (!_client.Client.IsBound) return ConnectionState.None;
+            if (_udpClient is null) return ConnectionState.None;
+            if (!_udpClient.Client.IsBound) return ConnectionState.None;
             if (_isServer)
             {
                 return ConnectionState.Hosting;
@@ -75,14 +73,17 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         }
     }
 
-    [MemberNotNullWhen(true, nameof(_client))]
-    public override bool IsConnected => _client != null && (_isServer || _thisIsMe is not null);
+    [MemberNotNullWhen(true, nameof(_udpClient))]
+    public override bool IsConnected =>
+        _udpClient is not null &&
+        _udpClient.Client.IsBound &&
+        (_isServer || _thisIsMe is not null);
 
     #endregion
 
     #region Fields
 
-    UdpClient? _client;
+    UdpClient? _udpClient;
     Thread? _listeningThread;
 
     bool _isServer;
@@ -94,13 +95,13 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
     public override void StartClient(IPEndPoint endPoint)
     {
-        _client = new UdpClient
+        _udpClient = new UdpClient
         {
             DontFragment = true,
         };
 
         Debug.WriteLine($"[Net]: Connecting to {endPoint} ...");
-        _client.Connect(endPoint);
+        _udpClient.Connect(endPoint);
 
         _isServer = false;
         _thisIsMe = null;
@@ -120,7 +121,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
     public override void StartHost(IPEndPoint endPoint)
     {
-        _client = new UdpClient(endPoint)
+        _udpClient = new UdpClient(endPoint)
         {
             DontFragment = true,
         };
@@ -139,16 +140,16 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
     void Listen()
     {
-        if (_client is null) return;
+        if (_udpClient is null) return;
 
-        Debug.WriteLine($"[Net]: Listening on {_client.Client.LocalEndPoint}");
+        Debug.WriteLine($"[Net]: Listening on {_udpClient.Client.LocalEndPoint}");
 
         while (_shouldListen)
         {
             try
             {
                 IPEndPoint source = new(IPAddress.Any, 0);
-                byte[] buffer = _client.Receive(ref source);
+                byte[] buffer = _udpClient.Receive(ref source);
 
                 if (!_shouldListen) break;
 
@@ -157,9 +158,9 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
                 if (IsServer)
                 {
-                    if (!_connections.TryGetValue(source, out ConnectionClient? client))
+                    if (!_connections.TryGetValue(source, out Client? client))
                     {
-                        client = new ConnectionClient(source, null);
+                        client = new Client(source, null);
                         _connections.TryAdd(source, client);
                         Debug.WriteLine($"[Net]: Client {source} sending the first message ...");
                         OnClientConnected_Invoke(source, ConnectingPhase.Connected);
@@ -191,13 +192,8 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
         base.Close();
 
         _shouldListen = false;
-        _client?.Dispose();
-        _client = null;
-
-        Debug.WriteLine($"[Net]: Closed");
-
-        if (!_isServer)
-        { OnDisconnectedFromServer_Invoke(); }
+        _udpClient?.Dispose();
+        _udpClient = null;
     }
 
     #endregion
@@ -233,7 +229,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
     protected override void SendImmediate(Message message)
     {
-        if (_client is null) return;
+        if (_udpClient is null) return;
 
         _sentAt = Time.NowNoCache;
 
@@ -246,11 +242,11 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
             {
                 Debug.WriteLine($"[Net]: == ALL => {message}");
             }
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+            foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
             {
                 message.Index = client.Value.SendingIndex++;
                 byte[] data = Utils.Serialize(message);
-                _client.Send(data, data.Length, client.Key);
+                _udpClient.Send(data, data.Length, client.Key);
                 _sentBytes += data.Length;
                 if (message is ReliableMessage reliableMessage &&
                     reliableMessage.ShouldAck)
@@ -259,7 +255,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
                     {
                         Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
                     }
-                    client.Value.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                    client.Value.SentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                 }
             }
         }
@@ -271,7 +267,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
             {
                 Debug.WriteLine($"[Net]: == SERVER => {message}");
             }
-            _client.Send(data, data.Length);
+            _udpClient.Send(data, data.Length);
             _sentBytes += data.Length;
             if (message is ReliableMessage reliableMessage &&
                 reliableMessage.ShouldAck)
@@ -280,14 +276,14 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
                 {
                     Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
                 }
-                _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                _sentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
             }
         }
     }
 
     protected override void SendImmediate(byte[] data, IEnumerable<Message> message)
     {
-        if (_client is null) return;
+        if (_udpClient is null) return;
 
         _sentAt = Time.NowNoCache;
 
@@ -302,7 +298,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
             }
             foreach (IPEndPoint client in _connections.Keys)
             {
-                _client.Send(data, data.Length, client);
+                _udpClient.Send(data, data.Length, client);
                 _sentBytes += data.Length;
             }
         }
@@ -312,14 +308,14 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
             {
                 Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", message)}");
             }
-            _client.Send(data, data.Length);
+            _udpClient.Send(data, data.Length);
             _sentBytes += data.Length;
         }
     }
 
     protected override void SendImmediateTo(byte[] data, IPEndPoint destination, IEnumerable<Message> messages)
     {
-        if (_client is null) return;
+        if (_udpClient is null) return;
 
         _sentAt = Time.NowNoCache;
 
@@ -328,13 +324,13 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
 
         if (IsServer)
         {
-            if (_connections.TryGetValue(destination, out ConnectionClient? client))
+            if (_connections.TryGetValue(destination, out Client? client))
             {
                 if (Utils.IsDebug)
                 {
                     Debug.WriteLine($"[Net]: == {destination} => {string.Join(", ", messages)}");
                 }
-                _client.Send(data, data.Length, client.EndPoint);
+                _udpClient.Send(data, data.Length, client.EndPoint);
                 _sentBytes += data.Length;
                 client.SentAt = Time.NowNoCache;
             }
@@ -347,7 +343,7 @@ public class UdpConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMember
                 {
                     Debug.WriteLine($"[Net]: == SERVER => {string.Join(", ", messages)}");
                 }
-                _client.Send(data, data.Length);
+                _udpClient.Send(data, data.Length);
                 _sentBytes += data.Length;
             }
         }

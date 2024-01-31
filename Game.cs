@@ -32,7 +32,7 @@ public class Game
     [MemberNotNullWhen(true, nameof(_connection))]
     [MemberNotNullWhen(true, nameof(Connection))]
     public static bool HasConnection => singleton!._connection is not null;
-    public static ConnectionBase<PlayerInfo> Connection
+    public static Connection Connection
     {
         get => singleton!._connection ?? throw new NullReferenceException($"{nameof(_connection)} is null");
         set => singleton!._connection = value;
@@ -52,7 +52,7 @@ public class Game
     readonly Renderer<ConsoleChar> renderer;
 #endif
 
-    ConnectionBase<PlayerInfo>? _connection;
+    Connection? _connection;
     bool _isOffline;
 
     public readonly Joystick Joystick = new(default, default);
@@ -262,8 +262,8 @@ public class Game
                     return;
                 }
 
-                _connection ??= new UdpConnection<PlayerInfo>();
-                _connection.LocalUserInfo = new PlayerInfo() { Username = args[i] };
+                _connection ??= new UdpConnection();
+                _connection.LocalUserInfo = new UserDetails() { Username = args[i] };
                 continue;
             }
 
@@ -282,7 +282,7 @@ public class Game
                     return;
                 }
 
-                _connection ??= new UdpConnection<PlayerInfo>();
+                _connection ??= new UdpConnection();
                 _connection.StartHost(endPoint);
                 continue;
             }
@@ -302,7 +302,7 @@ public class Game
                     return;
                 }
 
-                _connection ??= new UdpConnection<PlayerInfo>();
+                _connection ??= new UdpConnection();
                 _connection.StartClient(endPoint);
                 continue;
             }

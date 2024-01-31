@@ -6,12 +6,9 @@ using System.Runtime.Versioning;
 using System.Text;
 using YeahGame.Messages;
 
-using ConnectionClientDetails = System.Net.WebSockets.WebSocket;
-using RawMessage = (System.ReadOnlyMemory<byte> Buffer, System.Net.IPEndPoint Source);
-
 namespace YeahGame;
 
-public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TUserInfo> : ConnectionBase<TUserInfo, ConnectionClientDetails> where TUserInfo : ISerializable
+public class WebSocketConnection : Connection<WebSocket>
 {
     class WebSocketRequest
     {
@@ -88,7 +85,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
     [UnsupportedOSPlatform("browser")]
     public override void StartHost(IPEndPoint endPoint)
     {
-        Close();
+        Reset();
 
         string url = $"http://{endPoint}/";
 
@@ -105,7 +102,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
     public override void StartClient(IPEndPoint endPoint)
     {
-        Close();
+        Reset();
 
         string url = $"ws://{endPoint}/";
 
@@ -162,9 +159,9 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                 case WebSocketMessageType.Binary:
                     if (IsServer)
                     {
-                        if (!_connections.TryGetValue(wsRequest.RemoteEndPoint, out ConnectionClient? client))
+                        if (!_connections.TryGetValue(wsRequest.RemoteEndPoint, out Client? client))
                         {
-                            client = new ConnectionClient(wsRequest.RemoteEndPoint, wsRequest.Task.Result.WebSocket);
+                            client = new Client(wsRequest.RemoteEndPoint, wsRequest.Task.Result.WebSocket);
                             _connections.TryAdd(wsRequest.RemoteEndPoint, client);
                             Debug.WriteLine($"[Net]: Client {wsRequest.RemoteEndPoint} sending the first message ...");
                             OnClientConnected_Invoke(wsRequest.RemoteEndPoint, ConnectingPhase.Connected);
@@ -196,8 +193,6 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
     {
         base.Close();
 
-        Debug.WriteLine($"[Net]: Closing ...");
-
         webSocketClient?.Dispose();
         webSocketClient = null;
 
@@ -215,8 +210,27 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
         _connectionRemovals.Clear();
         _connections.Clear();
+    }
 
-        Debug.WriteLine($"[Net]: Closed");
+    void Reset()
+    {
+        webSocketClient?.Dispose();
+        webSocketClient = null;
+
+        if (IsServer)
+        {
+            httpListener?.Stop();
+            httpListener?.Close();
+        }
+        httpListener = null;
+
+        _serverEndPoint = null;
+
+        _outgoingQueue.Clear();
+        _incomingQueue.Clear();
+
+        _connectionRemovals.Clear();
+        _connections.Clear();
     }
 
     #region Message Handling & Receiving
@@ -355,7 +369,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
             {
                 Debug.WriteLine($"[Net]: == ALL => {message}");
             }
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+            foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
             {
                 if (client.Value.Details.State != WebSocketState.Open) continue;
 
@@ -371,7 +385,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                     {
                         Debug.WriteLine($"[Net]: == {client.Key} => Waiting ACK for {message.Index} ...");
                     }
-                    client.Value.SentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                    client.Value.SentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
                 }
             }
         }
@@ -393,7 +407,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
                 {
                     Debug.WriteLine($"[Net]: == SERVER => Waiting ACK for {message.Index} ...");
                 }
-                _sentReliableMessages[message.Index] = (reliableMessage.Copy(), (float)Time.NowNoCache);
+                _sentReliableMessages[message.Index] = SentReliableMessage.From(reliableMessage);
             }
         }
     }
@@ -411,7 +425,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
             {
                 Debug.WriteLine($"[Net]: == ALL => {string.Join(", ", message)}");
             }
-            foreach (KeyValuePair<IPEndPoint, ConnectionClient> client in _connections)
+            foreach (KeyValuePair<IPEndPoint, Client> client in _connections)
             {
                 if (client.Value.Details.State != WebSocketState.Open) continue;
 
@@ -441,7 +455,7 @@ public class WebSocketConnection<[DynamicallyAccessedMembers(DynamicallyAccessed
 
         if (IsServer)
         {
-            if (_connections.TryGetValue(destination, out ConnectionClient? client))
+            if (_connections.TryGetValue(destination, out Client? client))
             {
                 if (client.Details.State != WebSocketState.Open) return;
 

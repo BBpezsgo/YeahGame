@@ -33,12 +33,9 @@ public class MenuScene : Scene
         SelectedIndex = Biscuit.PlayerColor,
     };
 
-    const string LogoPath = @"C:\Users\bazsi\Desktop\logo.png";
-    readonly ConsoleImage? LogoImage = (OperatingSystem.IsBrowser() || !File.Exists(LogoPath)) ? null : ((ConsoleImage)Png.LoadFile(LogoPath, (0, 0, 0))).Scale(2, 1);
-
     public string? ExitReason;
 
-    ConsoleSelectBoxStyle ColorSelectBoxStyle = new(Styles.SelectBoxStyle);
+    readonly ConsoleSelectBoxStyle ColorSelectBoxStyle = new(Styles.SelectBoxStyle);
 
     public override void Load()
     {
@@ -56,8 +53,8 @@ public class MenuScene : Scene
 
         Game.Connection = ConnectionType.SelectedItem switch
         {
-            ConnectionType_UDP => new UdpConnection<PlayerInfo>(),
-            ConnectionType_WebSocket => new WebSocketConnection<PlayerInfo>(),
+            ConnectionType_UDP => new UdpConnection(),
+            ConnectionType_WebSocket => new WebSocketConnection(),
             _ => null!,
         };
         Game.Singleton.SetupConnectionListeners();
@@ -108,17 +105,16 @@ public class MenuScene : Scene
 
             SmallRect menuRect = Layout.Center(menuSize, new SmallRect(default, Game.Renderer.Size));
 
-            if (LogoImage != null)
-            {
-                const int LogoMenuSpace = 3;
-
-                Coord logoPos = default;
-
-                logoPos.X = (short)Layout.Center(LogoImage.Value.Width, Game.Renderer.Width);
-                logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - LogoImage.Value.Height);
-
-                Game.Renderer.Put(logoPos.X, logoPos.Y, LogoImage.Value.AsSpan(), LogoImage.Value.Width, LogoImage.Value.Height);
-            }
+            // {
+            //     const int LogoMenuSpace = 3;
+            // 
+            //     Coord logoPos = default;
+            // 
+            //     logoPos.X = (short)Layout.Center(ImageAssets.Logo.Width, Game.Renderer.Width);
+            //     logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - ImageAssets.Logo.Height);
+            // 
+            //     Game.Renderer.Put(logoPos.X, logoPos.Y, ImageAssets.Logo.AsSpan(), ImageAssets.Logo.Width, ImageAssets.Logo.Height);
+            // }
 
             Game.Renderer.Box(menuRect, CharColor.Black, CharColor.White);
             menuRect = menuRect.Margin(1, 2);
@@ -164,8 +160,8 @@ public class MenuScene : Scene
             {
                 Game.Connection = ConnectionType.SelectedItem switch
                 {
-                    ConnectionType_UDP => new UdpConnection<PlayerInfo>(),
-                    ConnectionType_WebSocket => new WebSocketConnection<PlayerInfo>(),
+                    ConnectionType_UDP => new UdpConnection(),
+                    ConnectionType_WebSocket => new WebSocketConnection(),
                     _ => null!,
                 };
                 Game.Singleton.SetupConnectionListeners();
@@ -178,9 +174,9 @@ public class MenuScene : Scene
                 InputSocketError = null;
 
                 if (!Game.HasConnection)
-                { Game.Connection = new UdpConnection<PlayerInfo>(); }
+                { Game.Connection = new UdpConnection(); }
                 Game.Singleton.SetupConnectionListeners();
-                Game.Connection.LocalUserInfo = new PlayerInfo()
+                Game.Connection.LocalUserInfo = new UserDetails()
                 {
                     Username = InputName.Value.ToString(),
                     Color = PlayerColor.SelectedItem,
@@ -201,7 +197,7 @@ public class MenuScene : Scene
             else if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Connect", Styles.ButtonStyle))
             {
                 InputSocketError = null;
-                Game.Connection.LocalUserInfo = new PlayerInfo()
+                Game.Connection.LocalUserInfo = new UserDetails()
                 {
                     Username = InputName.Value.ToString(),
                     Color = PlayerColor.SelectedItem,
@@ -247,7 +243,7 @@ public class MenuScene : Scene
                 else if (Game.Renderer.Button(new SmallRect(menuRect.Left, menuRect.Top + y++, menuRect.Width, 1), "Host", Styles.ButtonStyle))
                 {
                     InputSocketError = null;
-                    Game.Connection.LocalUserInfo = new PlayerInfo()
+                    Game.Connection.LocalUserInfo = new UserDetails()
                     {
                         Username = InputName.Value.ToString(),
                         Color = PlayerColor.SelectedItem,

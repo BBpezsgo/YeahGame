@@ -117,6 +117,13 @@ public class Program
         }
         */
 
+        // {
+        //     Image image = Image.LoadFile(@"C:\Users\bazsi\source\repos\YeahGame\logo.png", default).Value;
+        //     ConsoleImage consoleImage = (ConsoleImage)image;
+        //     System.Diagnostics.Debug.Write(consoleImage.ToCSharp());
+        //     return;
+        // }
+
         Game game = new(
 #if !SERVER
             OperatingSystem.IsWindows() ? new ConsoleRenderer() : new AnsiRenderer()

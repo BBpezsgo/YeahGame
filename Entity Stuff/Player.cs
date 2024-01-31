@@ -27,7 +27,7 @@ public class Player : NetworkEntity
 
     public byte Color => PlayerInfo is null ? CharColor.White : (byte)PlayerInfo.Color.Value;
 
-    public PlayerInfo? PlayerInfo => Game.Connection.TryGetUserInfo(Owner, out ConnectionUserInfo<PlayerInfo> info) ? info.Info : null;
+    public UserDetails? PlayerInfo => Game.Connection.TryGetUserInfo(Owner, out ConnectionUserDetails info) ? info.Details : null;
 
     public Player()
     {
@@ -78,13 +78,13 @@ public class Player : NetworkEntity
             }
 
             if (Keyboard.IsKeyDown('E') &&
-                Game.Connection.TryGetUserInfo(Owner, out var info) &&
-                info.Info is not null &&
-                info.Info.Items.Value.Count > 0)
+                Game.Connection.TryGetUserInfo(Owner, out ConnectionUserDetails info) &&
+                info.Details is not null &&
+                info.Details.Items.Value.Count > 0)
             {
-                ItemType item = info.Info.Items.Value[0];
-                info.Info.Items.Value.RemoveAt(0);
-                info.Info.Items.WasChanged = true;
+                ItemType item = info.Details.Items.Value[0];
+                info.Details.Items.Value.RemoveAt(0);
+                info.Details.Items.WasChanged = true;
                 switch (item)
                 {
                     case ItemType.RapidFire:
@@ -193,7 +193,7 @@ public class Player : NetworkEntity
 
         byte color = CharColor.White;
 
-        PlayerInfo? info = PlayerInfo;
+        UserDetails? info = PlayerInfo;
 
         if (info is not null)
         {
@@ -261,6 +261,12 @@ public class Player : NetworkEntity
             projectilePosition = reader.ReadVector2();
             Vector2 velocity = default;
             velocity = reader.ReadVector2();
+
+            Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity))
+            {
+                Position = Position,
+            });
+
             velocity *= Projectile.Speed;
             velocity *= new Vector2(1, 0.5f);
 

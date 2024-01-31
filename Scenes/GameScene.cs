@@ -135,12 +135,12 @@ public class GameScene : Scene
 
         if (Keyboard.IsKeyHold('\t'))
         {
-            IReadOnlyDictionary<IPEndPoint, ConnectionUserInfo<PlayerInfo>> infos = Game.Connection.UserInfos;
+            IReadOnlyDictionary<IPEndPoint, ConnectionUserDetails> infos = Game.Connection.UserInfos;
 
             bool selfContained = false;
             if (!Game.Connection.IsServer)
             {
-                foreach (KeyValuePair<IPEndPoint, ConnectionUserInfo<PlayerInfo>> item in infos)
+                foreach (KeyValuePair<IPEndPoint, ConnectionUserDetails> item in infos)
                 {
                     if (item.Key.Equals(Game.Connection.LocalEndPoint))
                     {
@@ -161,7 +161,7 @@ public class GameScene : Scene
             if (!selfContained)
             { Game.Renderer.Text(box.Left, box.Top + y++, $"{Game.Connection.LocalUserInfo?.Username} ({Game.Connection.LocalEndPoint}){(Game.Connection.IsServer ? " (Server)" : string.Empty)}", CharColor.BrightMagenta); }
 
-            foreach (KeyValuePair<IPEndPoint, ConnectionUserInfo<PlayerInfo>> item in infos)
+            foreach (KeyValuePair<IPEndPoint, ConnectionUserDetails> item in infos)
             {
                 StringBuilder builder = new();
                 byte color = CharColor.White;
@@ -169,8 +169,8 @@ public class GameScene : Scene
                 if (item.Key.Equals(Game.Connection.LocalEndPoint))
                 { color = CharColor.BrightMagenta; }
 
-                if (item.Value.Info != null)
-                { builder.Append($"{item.Value.Info.Username} "); }
+                if (item.Value.Details != null)
+                { builder.Append($"{item.Value.Details.Username} "); }
 
                 builder.Append($"({item.Key})");
 
@@ -214,7 +214,7 @@ public class GameScene : Scene
 
             if (Game.Connection.LocalUserInfo is not null)
             {
-                PlayerInfo info = Game.Connection.LocalUserInfo;
+                UserDetails info = Game.Connection.LocalUserInfo;
                 int y = Game.Renderer.Height - 2;
 
                 if (Game.Singleton.Joystick.Rect != default)
@@ -772,11 +772,11 @@ public class GameScene : Scene
     {
         if (!Game.IsServer && !Game.IsOffline) return false;
 
-        if (Game.Connection.TryGetUserInfo(owner, out ConnectionUserInfo<PlayerInfo> userInfo) &&
-            userInfo.Info is not null)
+        if (Game.Connection.TryGetUserInfo(owner, out ConnectionUserDetails userInfo) &&
+            userInfo.Details is not null)
         {
-            userInfo.Info.Items.Value.Add(item.Type);
-            userInfo.Info.Items.WasChanged = true;
+            userInfo.Details.Items.Value.Add(item.Type);
+            userInfo.Details.Items.WasChanged = true;
 
             if (Game.IsServer)
             {
@@ -784,7 +784,7 @@ public class GameScene : Scene
                 {
                     IsServer = owner.Equals(Game.Connection.LocalEndPoint),
                     Source = owner,
-                    Details = Utils.Serialize(userInfo.Info),
+                    Details = Utils.Serialize(userInfo.Details),
                 });
             }
             return true;

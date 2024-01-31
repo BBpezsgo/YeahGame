@@ -24,9 +24,9 @@ public class Chat
             {
                 if (Source.IsSystem)
                 { return string.Empty; }
-                if (Game.Connection.TryGetUserInfo(Source.EndPoint, out ConnectionUserInfo<PlayerInfo> sourceInfo) &&
-                    sourceInfo.Info is not null)
-                { return $"<{sourceInfo.Info.Username}>"; }
+                if (Game.Connection.TryGetUserInfo(Source.EndPoint, out ConnectionUserDetails sourceInfo) &&
+                    sourceInfo.Details is not null)
+                { return $"<{sourceInfo.Details.Username}>"; }
                 else if (Source.EndPoint is not null)
                 { return $"<{Source.EndPoint}>"; }
                 else if (Source.IsServer)

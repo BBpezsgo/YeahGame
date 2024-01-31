@@ -56,10 +56,10 @@ public class Png
         ((x & 0x00ff) << 8) +       // First byte
         ((x & 0xff00) >> 8));       // Second byte
 
-    static bool DecodeHeader(byte[] data, ref int i)
+    static bool DecodeHeader(ReadOnlySpan<byte> data, ref int i)
     {
         i++;
-        string signatureText = System.Text.Encoding.ASCII.GetString(data, i, 3);
+        string signatureText = System.Text.Encoding.ASCII.GetString(data.Slice(i, 3));
         i += 3;
         i += 2;
         i++;
@@ -90,14 +90,14 @@ public class Png
         return data[i++];
     }
 
-    bool DecodeChunk(byte[] data, ref int i)
+    bool DecodeChunk(ReadOnlySpan<byte> data, ref int i)
     {
         uint length = GetInt(data, ref i);
-        string type = System.Text.Encoding.ASCII.GetString(data, i, 4);
+        string type = System.Text.Encoding.ASCII.GetString(data.Slice(i, 4));
         i += 4;
-        ReadOnlySpan<byte> chunkData = data.AsSpan(i, (int)length);
+        ReadOnlySpan<byte> chunkData = data.Slice(i, (int)length);
         i += (int)length;
-        uint crc = BitConverter.ToUInt32(data, i);
+        uint crc = BitConverter.ToUInt32(data[i..]);
         i += 4;
 
         return DecodeChunkData(chunkData, type);
@@ -167,7 +167,19 @@ public class Png
         return GenerateImage(imageData, background);
     }
 
-    byte[] LoadImageData(byte[] rawFileData)
+    TransparentImage LoadFileInternal(ReadOnlySpan<byte> data)
+    {
+        byte[] imageData = LoadImageData(data);
+        return GenerateImage(imageData);
+    }
+
+    Image LoadFileInternal(ReadOnlySpan<byte> data, Color background)
+    {
+        byte[] imageData = LoadImageData(data);
+        return GenerateImage(imageData, background);
+    }
+
+    byte[] LoadImageData(ReadOnlySpan<byte> rawFileData)
     {
         int pixelIndex = 0;
 
@@ -281,4 +293,6 @@ public class Png
 
     public static TransparentImage LoadFile(string file) => new Png().LoadFileInternal(file);
     public static Image LoadFile(string file, Color background) => new Png().LoadFileInternal(file, background);
+    public static TransparentImage LoadFile(ReadOnlySpan<byte> data) => new Png().LoadFileInternal(data);
+    public static Image LoadFile(ReadOnlySpan<byte> data, Color background) => new Png().LoadFileInternal(data, background);
 }
