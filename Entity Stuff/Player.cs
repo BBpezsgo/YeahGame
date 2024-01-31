@@ -262,7 +262,7 @@ public class Player : NetworkEntity
             Vector2 velocity = default;
             velocity = reader.ReadVector2();
 
-            Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity))
+            Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity), Utils.Random)
             {
                 Position = Position,
             });
