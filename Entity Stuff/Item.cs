@@ -6,7 +6,7 @@ namespace YeahGame;
 public enum ItemType : byte
 {
     RapidFire,
-    TeleportPrank,
+    SuicideBomber,
 }
 
 public class Item : NetworkEntity
@@ -29,8 +29,8 @@ public class Item : NetworkEntity
             case ItemType.RapidFire:
                 Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
                 break;
-            case ItemType.TeleportPrank:
-                Game.Renderer[Position] = new ConsoleChar('2', CharColor.White);
+            case ItemType.SuicideBomber:
+                Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
                 break;
             default:
                 throw new NotImplementedException();

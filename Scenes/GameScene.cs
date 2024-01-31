@@ -80,12 +80,18 @@ public class GameScene : Scene
 
             for (int i = 0; i < SpawnItems; i++)
             {
-                Vector2 position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50));
                 SpawnEntity(new Item()
                 {
                     NetworkId = GenerateNetworkId(),
-                    Position = position,
+                    Position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50)),
                     Type = ItemType.RapidFire,
+                });
+
+                SpawnEntity(new Item()
+                {
+                    NetworkId = GenerateNetworkId(),
+                    Position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50)),
+                    Type = ItemType.SuicideBomber,
                 });
             }
 
@@ -188,7 +194,7 @@ public class GameScene : Scene
                 Game.Renderer.Text(box.Left, box.Top + y++, builder.ToString(), color);
             }
         }
-        else if (!TryGetLocalPlayer(out Player? localPlayer) && Game.Connection.IsConnected)
+        else if (!TryGetLocalPlayer(out Player? localPlayer))
         {
             SmallRect box = Layout.Center(new SmallSize(50, 7), new SmallRect(default, Game.Renderer.Size));
 
@@ -261,7 +267,7 @@ public class GameScene : Scene
             });
         }
 
-        if (Game.IsServer)
+        if (Game.IsServer || Game.IsOffline)
         {
             foreach (IPEndPoint client in Game.Connection.Connections)
             {

@@ -90,7 +90,17 @@ public class Player : NetworkEntity, IDamageable
                     case ItemType.RapidFire:
                         GetPowerUpTime = Time.Now;
                         break;
-                    case ItemType.TeleportPrank:
+                    case ItemType.SuicideBomber:
+                        DoesExist = false;
+                        for (int i = 0; i < Game.Singleton.GameScene.Entities.Count; i++)
+                        {
+                            Entity explodedEntity = Game.Singleton.GameScene.Entities[i];
+                            if (explodedEntity is IDamageable &&
+                                Vector2.Distance(Position, explodedEntity.Position) <= 5)
+                            {
+                                explodedEntity.DoesExist = false;
+                            }
+                        }
                         break;
                     default:
                         break;
