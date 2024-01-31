@@ -2,7 +2,7 @@
 
 namespace YeahGame;
 
-public class Tester : NetworkEntity
+public class Tester : NetworkEntity, IDamageable
 {
     public override EntityPrototype Prototype => EntityPrototype.Tester;
 

@@ -4,7 +4,7 @@ using YeahGame.Messages;
 
 namespace YeahGame;
 
-public class Player : NetworkEntity
+public class Player : NetworkEntity, IDamageable
 {
     const float Speed = 10;
     const float UsernameHoverDistance = 5f;

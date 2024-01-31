@@ -65,8 +65,7 @@ public class Projectile : Entity
             if (Vector2.Distance(p, entity.Position) <= 1.5f &&
                 Vector2.Distance(lastPos + (deltaPos * .5f), entity.Position) <= MathF.Max(1f, deltaPos.Length()))
             {
-                if (entity is Player player) player.Damage(Damage);
-                if (entity is Tester tester) tester.Damage(Damage);
+                if (entity is IDamageable damageable) damageable.Damage(Damage);
 
                 DoesExist = false;
                 return;
