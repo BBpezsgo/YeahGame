@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 using Win32.Common;
+using Win32.Gdi32;
 using YeahGame.Messages;
 
 namespace YeahGame;
@@ -79,7 +80,7 @@ public class GameScene : Scene
 
             for (int i = 0; i < SpawnItems; i++)
             {
-                Vector2 position = Random.Shared.NextVector2(new Vector2(10, 10), new Vector2(50, 50));
+                Vector2 position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50));
                 SpawnEntity(new Item()
                 {
                     NetworkId = GenerateNetworkId(),
@@ -93,7 +94,7 @@ public class GameScene : Scene
             //     AddEntity(new Tester()
             //     {
             //         NetworkId = GenerateNetworkId(),
-            //         Position = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(MapWidth, MapHeight)),
+            //         Position = Utils.Random.NextVector2(new Vector2(0f, 0f), new Vector2(MapWidth, MapHeight)),
             //     });
             // }
         }
@@ -318,6 +319,44 @@ public class GameScene : Scene
             }
         }
 
+        if (Keyboard.IsKeyDown('F') &&
+            !Chat.IsChatting)
+        {
+            SpawnEntity(new GasParticles(new GasParticlesConfig()
+            {
+                Characters = "a",
+                Color = new Gradient(GdiColor.Yellow, GdiColor.Red),
+                Damp = .996f,
+                Lifetime = (.5f, 2f),
+                ParticleCount = (20, 30),
+                SpawnConfig = new GasParticlesSpawnConfig()
+                {
+                    InitialLocalDirection = default,
+                    InitialLocalVelocity = (10, 20),
+                    Spread = (0f, MathF.PI * 2f),
+                },
+            }, Utils.Random) {
+                Position = Mouse.RecordedConsolePosition,
+            });
+            
+            SpawnEntity(new Particles(new ParticlesConfig()
+            {
+                Characters = ".",
+                Color = (GdiColor.White, GdiColor.Yellow),
+                Damp = .994f,
+                Lifetime = (.5f, 1f),
+                ParticleCount = (10, 30),
+                SpawnConfig = new ParticlesSpawnConfig()
+                {
+                    InitialLocalDirection = default,
+                    InitialLocalVelocity = (20, 50),
+                    Spread = (0f, MathF.PI * 2f),
+                },
+            }, Utils.Random) {
+                Position = Mouse.RecordedConsolePosition,
+            });
+        }
+        
         {
             int i = -1;
             while (++i < _entities.Count)
@@ -763,7 +802,7 @@ public class GameScene : Scene
 
     Vector2 GetSpawnPoint()
     {
-        return Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(10f, 10f));
+        return Utils.Random.NextVector2(new Vector2(0f, 0f), new Vector2(10f, 10f));
     }
 
     public bool OnItemPickedUp(Item item, string owner)

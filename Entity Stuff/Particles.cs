@@ -8,14 +8,14 @@ public ref struct ParticlesSpawnConfig
     public Interval<float> InitialLocalVelocity;
     public Interval<float> Spread;
 
-    public readonly (Vector2 Position, Vector2 Velocity) Calc()
+    public readonly (Vector2 Position, Vector2 Velocity) Calc(Random random)
     {
         Vector2 position = default;
-        Vector2 velocity = InitialLocalDirection * Random.Shared.Next(Interval.GetFixed(InitialLocalVelocity));
+        Vector2 velocity = InitialLocalDirection * random.Next(Interval.GetFixed(InitialLocalVelocity));
 
         if (Spread != 0f)
         {
-            float spread = Random.Shared.Next(Interval.GetFixed(Spread));
+            float spread = random.Next(Interval.GetFixed(Spread));
             velocity.X = velocity.X * MathF.Cos(spread) - velocity.Y * MathF.Sin(spread);
             velocity.Y = velocity.X * MathF.Sin(spread) + velocity.Y * MathF.Cos(spread);
         }
@@ -50,11 +50,11 @@ public class Particles : Entity
     readonly Interval<GdiColor> _color;
     readonly float _damp;
 
-    public Particles(ParticlesConfig config)
+    public Particles(ParticlesConfig config, Random random)
     {
         IsSolid = false;
 
-        _particles = new Particle[Math.Max(0, Random.Shared.Next(Interval.GetFixed(config.ParticleCount)))];
+        _particles = new Particle[Math.Max(0, random.Next(Interval.GetFixed(config.ParticleCount)))];
         _characters = config.Characters.ToArray();
         _color = config.Color;
         _damp = config.Damp;
@@ -64,8 +64,8 @@ public class Particles : Entity
             ref Particle particle = ref _particles[i];
             particle.IsAlive = true;
             particle.BornAt = Time.Now;
-            particle.LifeTime = Random.Shared.Next(Interval.GetFixed(config.Lifetime));
-            (Vector2 position, Vector2 velocity) = config.SpawnConfig.Calc();
+            particle.LifeTime = random.Next(Interval.GetFixed(config.Lifetime));
+            (Vector2 position, Vector2 velocity) = config.SpawnConfig.Calc(random);
             particle.LocalPosition = position;
             particle.LocalVelocity = velocity;
         }

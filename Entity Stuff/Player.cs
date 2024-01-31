@@ -143,7 +143,7 @@ public class Player : NetworkEntity
 
             if (Game.IsServer || Game.IsOffline)
             {
-                Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity))
+                Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity), Utils.Random)
                 {
                     Position = Position,
                 });
@@ -212,7 +212,7 @@ public class Player : NetworkEntity
     {
         base.OnDestroy();
 
-        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetDeath(CharColor.GetColor(Color)))
+        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetDeath(CharColor.GetColor(Color)), Utils.Random)
         {
             Position = Position,
         });
