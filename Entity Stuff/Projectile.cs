@@ -78,7 +78,7 @@ public class Projectile : Entity
     {
         base.OnDestroy();
 
-        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetImpact(-Vector2.Normalize(Velocity)))
+        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetImpact(-Vector2.Normalize(Velocity)), Utils.Random)
         {
             Position = Position,
         });

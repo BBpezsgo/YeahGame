@@ -7,7 +7,7 @@ public class Tester : NetworkEntity
     public override EntityPrototype Prototype => EntityPrototype.Tester;
 
     float HP = 1f;
-    Vector2 Target = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(50, 50));
+    Vector2 Target = Utils.Random.NextVector2(new Vector2(0f, 0f), new Vector2(50, 50));
 
     public Tester()
     {
@@ -26,7 +26,7 @@ public class Tester : NetworkEntity
 
         // if (Vector2.Distance(Position, Target) < 1f)
         // {
-        //     Target = Random.Shared.NextVector2(new Vector2(0f, 0f), new Vector2(50, 50));
+        //     Target = Utils.Random.NextVector2(new Vector2(0f, 0f), new Vector2(50, 50));
         // }
         // else
         // {
@@ -51,7 +51,7 @@ public class Tester : NetworkEntity
     {
         base.OnDestroy();
 
-        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetDeath(new Win32.Gdi32.GdiColor(255, 255, 255)))
+        Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetDeath(new Win32.Gdi32.GdiColor(255, 255, 255)), Utils.Random)
         {
             Position = Position,
         });

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using Win32.Gdi32;
 
 namespace YeahGame;
 
@@ -13,6 +14,98 @@ public static partial class Utils
 #else
         false;
 #endif
+
+    public static readonly Random Random = new(69);
+
+    public static void FastBlur(Span2D<GdiColor> img, int radius)
+    {
+        if (radius < 1) { return; }
+
+        int w = img.Width;
+        int h = img.Height;
+        int wm = w - 1;
+        int hm = h - 1;
+        int wh = w * h;
+        int div = radius + radius + 1;
+        int[] r = new int[wh];
+        int[] g = new int[wh];
+        int[] b = new int[wh];
+        int rsum, gsum, bsum, x, y, i, yp, yi, yw;
+        GdiColor p, p1, p2;
+        int[] vmin = new int[Math.Max(w, h)];
+        int[] vmax = new int[Math.Max(w, h)];
+
+        int[] dv = new int[256 * div];
+        for (i = 0; i < 256 * div; i++){
+            dv[i] = i / div;
+        }
+
+        yw = yi = 0;
+
+        for (y = 0; y < h; y++)
+        {
+            rsum = gsum = bsum = 0;
+            for(i = -radius; i <= radius; i++)
+            {
+                p = img.Span[yi + Math.Min(wm, Math.Max(i, 0))];
+                rsum += p.R;
+                gsum += p.G;
+                bsum += p.B;
+            }
+            for (x = 0; x < w; x++)
+            {
+                r[yi] = dv[rsum];
+                g[yi] = dv[gsum];
+                b[yi] = dv[bsum];
+
+                if ( y == 0)
+                {
+                    vmin[x] = Math.Min( x + radius + 1, wm);
+                    vmax[x] = Math.Max( x - radius, 0);
+                }
+                p1 = img.Span[yw + vmin[x]];
+                p2 = img.Span[yw + vmax[x]];
+
+                rsum += p1.R - p2.R;
+                gsum += p1.G - p2.G;
+                bsum += p1.B - p2.B;
+                yi++;
+            }
+            yw += w;
+        }
+
+        for (x = 0; x < w; x++)
+        {
+            rsum = gsum = bsum = 0;
+            yp = -radius * w;
+            for(i = -radius; i <= radius; i++)
+            {
+                yi = Math.Max(0, yp) + x;
+                rsum += r[yi];
+                gsum += g[yi];
+                bsum += b[yi];
+                yp += w;
+            }
+            yi = x;
+            for (y = 0; y < h; y++)
+            {
+                img.Span[yi] = (GdiColor)unchecked(((uint)0xff000000 | ((uint)dv[rsum]<<16) | ((uint)dv[gsum]<<8) |(uint) dv[bsum]));
+                if(x == 0)
+                {
+                    vmin[y]=Math.Min(y+radius+1,hm)*w;
+                    vmax[y]=Math.Max(y-radius,0)*w;
+                }
+                p1 = unchecked((uint)(x + vmin[y]));
+                p2 = unchecked((uint)(x + vmax[y]));
+
+                rsum+=r[p1]-r[p2];
+                gsum+=g[p1]-g[p2];
+                bsum+=b[p1]-b[p2];
+
+                yi+=w;
+            }
+        }
+    }
 
     public static string FormatMemorySize(int byteCount)
     {
