@@ -49,7 +49,7 @@ public class MenuScene : Scene
             ConnectionType_WebSocket => 1,
             _ => -1,
         };
-        PlayerColor.SelectedIndex = Biscuit.PlayerColor;
+        PlayerColor.SelectedItem = (PlayerColor)Biscuit.PlayerColor;
 
         Game.Connection = ConnectionType.SelectedItem switch
         {
@@ -183,6 +183,7 @@ public class MenuScene : Scene
                 };
 
                 Biscuit.Username = InputName.Value.ToString();
+                Biscuit.PlayerColor = (int)PlayerColor.SelectedItem;
 
                 Game.IsOffline = true;
             }
@@ -214,6 +215,7 @@ public class MenuScene : Scene
                         Biscuit.Socket = InputSocket.Value.ToString();
                         Biscuit.Username = InputName.Value.ToString();
                         Biscuit.ConnectionType = ConnectionType.SelectedItem;
+                        Biscuit.PlayerColor = (int)PlayerColor.SelectedItem;
                     }
                     catch (SocketException socketException)
                     { InputSocketError = socketException.SocketErrorCode.ToString(); }
@@ -254,6 +256,7 @@ public class MenuScene : Scene
                     Biscuit.Socket = InputSocket.Value.ToString();
                     Biscuit.Username = InputName.Value.ToString();
                     Biscuit.ConnectionType = ConnectionType.SelectedItem;
+                    Biscuit.PlayerColor = (int)PlayerColor.SelectedItem;
 
                     if (TryParseSocket(InputSocket.Value.ToString(), out IPEndPoint? endPoint, out string? error))
                     {
