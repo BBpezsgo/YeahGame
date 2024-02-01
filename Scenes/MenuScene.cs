@@ -311,7 +311,7 @@ public class MenuScene : Scene
 
             Console.WriteLine($"Socket is \"{socket}\"");
 
-            ConnectionBase<PlayerInfo> connection;
+            Connection connection;
             Console.WriteLine($"Enter a connection type (default is \"{defaultConnectionType}\"):");
             while (true)
             {
@@ -324,7 +324,7 @@ public class MenuScene : Scene
                 if (_connectionType == "udp" ||
                     _connectionType == "u")
                 {
-                    connection = new UdpConnection<PlayerInfo>();
+                    connection = new UdpConnection();
                     Console.WriteLine($"Connection type is UDP");
                     break;
                 }
@@ -334,7 +334,7 @@ public class MenuScene : Scene
                     _connectionType == "web" ||
                     _connectionType == "w")
                 {
-                    connection = new WebSocketConnection<PlayerInfo>();
+                    connection = new WebSocketConnection();
                     Console.WriteLine($"Connection type is WebSocket");
                     break;
                 }
@@ -343,7 +343,7 @@ public class MenuScene : Scene
             }
 
             Game.Connection = connection;
-            Game.Singleton.SetupConnectionListeners(connection);
+            Game.Singleton.SetupConnectionListeners();
 
             try
             {

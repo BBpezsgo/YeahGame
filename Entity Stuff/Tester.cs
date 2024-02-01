@@ -4,10 +4,16 @@ namespace YeahGame;
 
 public class Tester : NetworkEntity, IDamageable
 {
+    const float NetPositionThreshold = .5f;
+    const float NetPositionMaxSleep = 3f;
+
     public override EntityPrototype Prototype => EntityPrototype.Tester;
 
     float HP = 1f;
     Vector2 Target = Utils.Random.NextVector2(new Vector2(0f, 0f), new Vector2(50, 50));
+
+    Vector2 NetPosition;
+    float LastNetPositionTime;
 
     public Tester()
     {
@@ -83,7 +89,13 @@ public class Tester : NetworkEntity, IDamageable
 
     protected override void SyncUp(BinaryWriter writer)
     {
-        writer.Write(Position);
+        if (Vector2.DistanceSquared(NetPosition, Position) >= NetPositionThreshold * NetPositionThreshold ||
+            Time.Now - LastNetPositionTime > NetPositionMaxSleep)
+        {
+            LastNetPositionTime = Time.Now;
+            NetPosition = Position;
+            writer.Write(Position);
+        }
     }
 
     #endregion

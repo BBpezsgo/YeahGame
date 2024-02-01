@@ -230,10 +230,12 @@ public class Game
 
     public void OnResized()
     {
+#if !SERVER
         if (Game.DebugPanel) _debugPanel.RefreshPosition(renderer.Size);
+#endif
     }
 
-
+#if !SERVER
     public bool MouseBlockedByUI(Coord point)
     {
         if (DebugPanel)
@@ -248,6 +250,7 @@ public class Game
 
         return false;
     }
+#endif
 
     void ProcessArguments(string[] args)
     {
@@ -355,7 +358,6 @@ public class Game
         //     ConsoleChar c = renderer[Mouse.RecordedConsolePosition];
         //     renderer[Mouse.RecordedConsolePosition] = new ConsoleChar(c.Char, CharColor.Invert(c.Foreground), CharColor.Invert(c.Background));
         // }
-#endif
 
         if (Touch.IsTouchDevice)
         {
@@ -364,7 +366,10 @@ public class Game
             Joystick.Rect = new SmallRect(new Coord(Game.Renderer.Width - joystickWidth - 1, Game.Renderer.Height - joystickHeight - 1), new Coord(joystickWidth, joystickHeight));
             Joystick.Render(renderer);
         }
+#endif
     }
+
+#if !SERVER
 
     void DrawFpsMetrics(ref SmallRect rect)
     {
@@ -511,4 +516,6 @@ public class Game
 
         _connection.ResetCounter();
     }
+#endif
+
 }

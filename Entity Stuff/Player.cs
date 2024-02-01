@@ -73,6 +73,7 @@ public class Player : NetworkEntity, IDamageable
 
         if (!IsLocalOwned) return;
 
+#if !SERVER
         if (!Game.Singleton.GameScene.Chat.IsChatting)
         {
             Vector2 velocity = default;
@@ -119,10 +120,8 @@ public class Player : NetworkEntity, IDamageable
             }
         }
 
-#if !SERVER
         Position.X = Math.Clamp(Position.X, 0, Game.Renderer.Width - 1);
         Position.Y = Math.Clamp(Position.Y, 0, Game.Renderer.Height - 1);
-#endif
 
         CapturedTouch ??= new CapturedTouch();
         CapturedTouch.Tick(p => !Game.Singleton.MouseBlockedByUI((Coord)p));
@@ -159,6 +158,7 @@ public class Player : NetworkEntity, IDamageable
         }
 
         SyncUp();
+#endif
     }
 
     void UsePowerup(ItemType item)
