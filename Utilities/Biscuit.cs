@@ -80,14 +80,29 @@ public class Biscuit
 
     static Biscuit _singleton = new();
 
+    public static Action<string>? Saver;
+    public static Func<string?>? Loader;
+
     static void Load()
     {
-        if (!File.Exists(FileName))
-        { return; }
+        string? data = null;
+
+        if (Loader is not null)
+        {
+            data = Loader.Invoke();
+        }
+
+        if (data is null)
+        {
+            if (!File.Exists(FileName))
+            { return; }
+
+            data = File.ReadAllText(FileName);
+        }
 
         try
         {
-            _singleton = JsonSerializer.Deserialize<Biscuit>(File.ReadAllText(FileName), BiscuitContext.Default.Biscuit) ?? new Biscuit();
+            _singleton = JsonSerializer.Deserialize<Biscuit>(data, BiscuitContext.Default.Biscuit) ?? new Biscuit();
         }
         catch (JsonException)
         { }
@@ -95,6 +110,14 @@ public class Biscuit
 
     static void Save()
     {
-        File.WriteAllText(FileName, JsonSerializer.Serialize<Biscuit>(_singleton, BiscuitContext.Default.Biscuit));
+        string data = JsonSerializer.Serialize<Biscuit>(_singleton, BiscuitContext.Default.Biscuit);
+
+        if (Saver is not null)
+        {
+            Saver.Invoke(data);
+            return;
+        }
+
+        File.WriteAllText(FileName, data);
     }
 }

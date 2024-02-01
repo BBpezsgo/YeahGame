@@ -368,7 +368,7 @@ public class Game
 
     void DrawFpsMetrics(ref SmallRect rect)
     {
-        renderer.Dropdown(rect.X + 1, rect.Bottom, _fpsDropdown, $"FPS: {_currentFps.Min}", Styles.DropdownStyle);
+        renderer.Dropdown(rect.X + 1, rect.Bottom, _fpsDropdown, $"FPS: {_currentFps.Min} - {_currentFps.Max}", Styles.DropdownStyle);
         rect.Bottom++;
 
         if (_fpsDropdown)
