@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using Win32.Common;
 
 namespace YeahGame;
@@ -105,16 +104,16 @@ public class MenuScene : Scene
 
             SmallRect menuRect = Layout.Center(menuSize, new SmallRect(default, Game.Renderer.Size));
 
-            // {
-            //     const int LogoMenuSpace = 3;
-            // 
-            //     Coord logoPos = default;
-            // 
-            //     logoPos.X = (short)Layout.Center(ImageAssets.Logo.Width, Game.Renderer.Width);
-            //     logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - ImageAssets.Logo.Height);
-            // 
-            //     Game.Renderer.Put(logoPos.X, logoPos.Y, ImageAssets.Logo.AsSpan(), ImageAssets.Logo.Width, ImageAssets.Logo.Height);
-            // }
+            {
+                const int LogoMenuSpace = 3;
+            
+                Coord logoPos = default;
+            
+                logoPos.X = (short)Layout.Center(ImageAssets.Logo.Width, Game.Renderer.Width);
+                logoPos.Y = (short)(menuRect.Top - LogoMenuSpace - ImageAssets.Logo.Height);
+            
+                Game.Renderer.Put(logoPos.X, logoPos.Y, ImageAssets.Logo.AsSpan(), ImageAssets.Logo.Width, ImageAssets.Logo.Height);
+            }
 
             Game.Renderer.Box(menuRect, CharColor.Black, CharColor.White);
             menuRect = menuRect.Margin(1, 2);

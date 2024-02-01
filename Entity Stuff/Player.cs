@@ -18,6 +18,7 @@ public class Player : NetworkEntity, IDamageable
 
     const int RPC_Shoot = 1;
     const int RPC_Damage = 2;
+    const int RPC_Powerup = 3;
 
     public bool IsLocalOwned => Game.Connection.LocalEndPoint?.Equals(Owner) ?? false;
     public override EntityPrototype Prototype => EntityPrototype.Player;
@@ -93,7 +94,19 @@ public class Player : NetworkEntity, IDamageable
                 ItemType item = info.Details.Items.Value[0];
                 info.Details.Items.Value.RemoveAt(0);
                 info.Details.Items.WasChanged = true;
+
                 UsePowerup(item);
+
+                Game.Connection.Send(new RPCMessage()
+                {
+                    ObjectId = NetworkId,
+                    RPCId = RPC_Powerup,
+                    ShouldAck = true,
+                    Details = Utils.Serialize(writer =>
+                    {
+                        writer.Write((byte)item);
+                    }),
+                });
             }
         }
 
@@ -115,7 +128,7 @@ public class Player : NetworkEntity, IDamageable
         }
         else
         {
-            shouldShoot = 
+            shouldShoot =
                 !Mouse.WasUsed &&
                 Mouse.IsPressed(MouseButton.Left) &&
                 !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition);
@@ -144,9 +157,17 @@ public class Player : NetworkEntity, IDamageable
         switch (item)
         {
             case ItemType.RapidFire:
+            {
                 GotRapidFireTime = Time.Now;
                 break;
+            }
+
             case ItemType.SuicideBomber:
+            {
+                if (!Game.IsServer &&
+                    !Game.IsOffline)
+                { break; }
+
                 DoesExist = false;
 
                 for (int i = 0; i < Game.Singleton.GameScene.Entities.Count; i++)
@@ -158,13 +179,16 @@ public class Player : NetworkEntity, IDamageable
                         explodedEntity.DoesExist = false;
                     }
                 }
-
                 break;
+            }
+
             case ItemType.DoubleFire:
+            {
                 GotDoubleFireTime = Time.Now;
                 break;
-            default:
-                break;
+            }
+
+            default: break;
         }
     }
 
@@ -319,6 +343,11 @@ public class Player : NetworkEntity, IDamageable
 
             case RPC_Damage:
                 Damage(reader.ReadSingle());
+                break;
+
+            case RPC_Powerup:
+                ItemType item = (ItemType)reader.ReadByte();
+                UsePowerup(item);
                 break;
         }
 

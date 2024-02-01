@@ -2,5 +2,5 @@
 
 public static class ImageAssets
 {
-    public static readonly ConsoleImage Logo = (ConsoleImage)Png.LoadFile(Properties.Resources.logo, default);
+    public static readonly ConsoleImage Logo = ((ConsoleImage)Png.LoadFile(Properties.Resources.logo, default)).Scale(2, 1);
 }
