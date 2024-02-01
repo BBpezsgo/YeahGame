@@ -76,25 +76,6 @@ public class GameScene : Scene
                 Position = GetSpawnPoint(),
             });
 
-            const int SpawnItems = 10;
-
-            for (int i = 0; i < SpawnItems; i++)
-            {
-                SpawnEntity(new Item()
-                {
-                    NetworkId = GenerateNetworkId(),
-                    Position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50)),
-                    Type = ItemType.RapidFire,
-                });
-
-                SpawnEntity(new Item()
-                {
-                    NetworkId = GenerateNetworkId(),
-                    Position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50)),
-                    Type = ItemType.SuicideBomber,
-                });
-            }
-
             // for (int i = 0; i < 5; i++)
             // {
             //     AddEntity(new Tester()
@@ -209,8 +190,7 @@ public class GameScene : Scene
         }
         else
         {
-            if (localPlayer is not null &&
-                Time.Now - highlightLocalPlayerTime < LocalPlayerHighlightTime)
+            if (Time.Now - highlightLocalPlayerTime < LocalPlayerHighlightTime)
             {
                 float t = (Time.Now - highlightLocalPlayerTime) / LocalPlayerHighlightTime;
                 t = 1f - t;
@@ -232,7 +212,11 @@ public class GameScene : Scene
                 for (int i = 0; i < info.Items.Value.Count; i++)
                 {
                     ItemType item = info.Items.Value[i];
-                    Game.Renderer.Text(Game.Renderer.Width - 10, y--, item.ToString());
+                    string itemName = Item.ItemNames[item];
+                    byte color = CharColor.Silver;
+                    if (i == 0)
+                    { color = CharColor.BrightCyan; }
+                    Game.Renderer.Text(Game.Renderer.Width - 1 - itemName.Length, y--, itemName, color);
                 }
             }
         }
@@ -305,6 +289,11 @@ public class GameScene : Scene
                     });
                 }
             }
+
+            if (_items.Count < 5)
+            {
+                SpawnRandomItem();
+            }
         }
 
         if (!TryGetLocalPlayer(out _))
@@ -325,44 +314,50 @@ public class GameScene : Scene
             }
         }
 
-        if (Keyboard.IsKeyDown('F') &&
+        if (Utils.IsDebug &&
+            Keyboard.IsKeyDown('F') &&
             !Chat.IsChatting)
         {
-            SpawnEntity(new GasParticles(new GasParticlesConfig()
+            SpawnEntity(new FlashEffect()
             {
-                Characters = "a",
-                Color = new Gradient(GdiColor.Yellow, GdiColor.Red),
-                Damp = .996f,
-                Lifetime = (.5f, 2f),
-                ParticleCount = (20, 30),
-                SpawnConfig = new GasParticlesSpawnConfig()
-                {
-                    InitialLocalDirection = default,
-                    InitialLocalVelocity = (10, 20),
-                    Spread = (0f, MathF.PI * 2f),
-                },
-            }, Utils.Random) {
                 Position = Mouse.RecordedConsolePosition,
             });
-            
-            SpawnEntity(new Particles(new ParticlesConfig()
-            {
-                Characters = ".",
-                Color = (GdiColor.White, GdiColor.Yellow),
-                Damp = .994f,
-                Lifetime = (.5f, 1f),
-                ParticleCount = (10, 30),
-                SpawnConfig = new ParticlesSpawnConfig()
-                {
-                    InitialLocalDirection = default,
-                    InitialLocalVelocity = (20, 50),
-                    Spread = (0f, MathF.PI * 2f),
-                },
-            }, Utils.Random) {
-                Position = Mouse.RecordedConsolePosition,
-            });
+
+            // SpawnEntity(new GasParticles(new GasParticlesConfig()
+            // {
+            //     Characters = "a",
+            //     Color = new Gradient(GdiColor.Yellow, GdiColor.Red),
+            //     Damp = .996f,
+            //     Lifetime = (.5f, 2f),
+            //     ParticleCount = (20, 30),
+            //     SpawnConfig = new GasParticlesSpawnConfig()
+            //     {
+            //         InitialLocalDirection = default,
+            //         InitialLocalVelocity = (10, 20),
+            //         Spread = (0f, MathF.PI * 2f),
+            //     },
+            // }, Utils.Random) {
+            //     Position = Mouse.RecordedConsolePosition,
+            // });
+            // 
+            // SpawnEntity(new Particles(new ParticlesConfig()
+            // {
+            //     Characters = ".",
+            //     Color = (GdiColor.White, GdiColor.Yellow),
+            //     Damp = .994f,
+            //     Lifetime = (.5f, 1f),
+            //     ParticleCount = (10, 30),
+            //     SpawnConfig = new ParticlesSpawnConfig()
+            //     {
+            //         InitialLocalDirection = default,
+            //         InitialLocalVelocity = (20, 50),
+            //         Spread = (0f, MathF.PI * 2f),
+            //     },
+            // }, Utils.Random) {
+            //     Position = Mouse.RecordedConsolePosition,
+            // });
         }
-        
+
         {
             int i = -1;
             while (++i < _entities.Count)
@@ -427,6 +422,7 @@ public class GameScene : Scene
                 ObjectId = networkEntity.NetworkId,
                 Details = details,
                 EntityPrototype = networkEntity.Prototype,
+                ShouldAck = true,
             });
         }
 
@@ -777,6 +773,34 @@ public class GameScene : Scene
 
     #region Utils
 
+    void SpawnRandomItem()
+    {
+        int attempts = 10;
+        while (attempts-- > 0)
+        {
+            Vector2 position = Utils.Random.NextVector2(new Vector2(10, 10), new Vector2(50, 50));
+            bool isGood = true;
+            foreach (Entity entity in EntitiesAt(position, 3f))
+            {
+                if (entity is Item or Player)
+                {
+                    isGood = false;
+                    break;
+                }
+            }
+
+            if (!isGood) continue;
+
+            SpawnEntity(new Item()
+            {
+                NetworkId = GenerateNetworkId(),
+                Position = position,
+                Type = Item.ItemTypes[Utils.Random.Next(0, Item.ItemTypes.Length)],
+            });
+            break;
+        }
+    }
+
     public bool MouseBlockedByUI(Coord point)
     {
         if (Keyboard.IsKeyHold('\t'))
@@ -836,6 +860,31 @@ public class GameScene : Scene
         }
 
         return false;
+    }
+
+    public IEnumerable<Entity> EntitiesAt(Vector2 position, float radius)
+    {
+        float radiusSqrt = radius * radius;
+        for (int i = 0; i < _entities.Count; i++)
+        {
+            if (Vector2.DistanceSquared(position, _entities[i].Position) <= radiusSqrt)
+            {
+                yield return _entities[i];
+            }
+        }
+    }
+
+    public IEnumerable<TEntity> EntitiesAt<TEntity>(Vector2 position, float radius) where TEntity : Entity
+    {
+        float radiusSqrt = radius * radius;
+        for (int i = 0; i < _entities.Count; i++)
+        {
+            if (_entities[i] is TEntity _entity &&
+                Vector2.DistanceSquared(position, _entities[i].Position) <= radiusSqrt)
+            {
+                yield return _entity;
+            }
+        }
     }
 
     #endregion

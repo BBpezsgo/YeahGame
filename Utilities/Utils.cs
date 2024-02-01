@@ -17,6 +17,15 @@ public static partial class Utils
 
     public static readonly Random Random = new(69);
 
+    public static Vector2 RotateVectorDeg(Vector2 vector, float deg)
+        => RotateVector(vector, deg * Utils.Deg2Rad);
+    public static Vector2 RotateVector(Vector2 vector, float rad)
+    {
+        vector.X = vector.X * MathF.Cos(rad) - vector.Y * MathF.Sin(rad);
+        vector.Y = vector.X * MathF.Sin(rad) + vector.Y * MathF.Cos(rad);
+        return vector;
+    }
+
     public static void FastBlur(Span2D<GdiColor> img, int radius)
     {
         if (radius < 1) { return; }

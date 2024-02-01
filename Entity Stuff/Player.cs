@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using Win32.Gdi32;
 using YeahGame.Messages;
 
 namespace YeahGame;
@@ -11,7 +10,14 @@ public class Player : NetworkEntity, IDamageable
     const float NetPositionThreshold = .5f;
     const float NetPositionMaxSleep = 3f;
     const float ReloadTime = .5f;
+    const float SelfDestructionDamageRadius = 5f;
+    const float RapidFireTime = 3.5f;
+    const float RapidFireReload = .2f;
+    const float DoubleFireTime = 5f;
     static readonly float InverseSqrt2 = 1f / MathF.Sqrt(2f);
+
+    const int RPC_Shoot = 1;
+    const int RPC_Damage = 2;
 
     public bool IsLocalOwned => Game.Connection.LocalEndPoint?.Equals(Owner) ?? false;
     public override EntityPrototype Prototype => EntityPrototype.Player;
@@ -19,7 +25,9 @@ public class Player : NetworkEntity, IDamageable
     public float HP = 1;
     public IPEndPoint? Owner;
     float LastShot = Time.Now;
-    float GetPowerUpTime = 0;
+
+    float GotRapidFireTime;
+    float GotDoubleFireTime;
 
     Vector2 NetPosition;
     float LastNetPositionTime;
@@ -85,26 +93,7 @@ public class Player : NetworkEntity, IDamageable
                 ItemType item = info.Details.Items.Value[0];
                 info.Details.Items.Value.RemoveAt(0);
                 info.Details.Items.WasChanged = true;
-                switch (item)
-                {
-                    case ItemType.RapidFire:
-                        GetPowerUpTime = Time.Now;
-                        break;
-                    case ItemType.SuicideBomber:
-                        DoesExist = false;
-                        for (int i = 0; i < Game.Singleton.GameScene.Entities.Count; i++)
-                        {
-                            Entity explodedEntity = Game.Singleton.GameScene.Entities[i];
-                            if (explodedEntity is IDamageable &&
-                                Vector2.Distance(Position, explodedEntity.Position) <= 5)
-                            {
-                                explodedEntity.DoesExist = false;
-                            }
-                        }
-                        break;
-                    default:
-                        break;
-                }
+                UsePowerup(item);
             }
         }
 
@@ -117,62 +106,103 @@ public class Player : NetworkEntity, IDamageable
         CapturedTouch.Tick(p => !Game.Singleton.MouseBlockedByUI((Coord)p));
 
         bool shouldShoot = false;
-        Vector2 shootPosition = default;
+        Vector2 shootTarget = default;
 
         if (Touch.IsTouchDevice)
         {
             shouldShoot = CapturedTouch.Has;
-            shootPosition = CapturedTouch.Position;
+            shootTarget = CapturedTouch.Position;
         }
         else
         {
-            shouldShoot = (
+            shouldShoot = 
                 !Mouse.WasUsed &&
                 Mouse.IsPressed(MouseButton.Left) &&
-                !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition)
-            );
-            shootPosition = Mouse.RecordedConsolePosition;
+                !Game.Singleton.MouseBlockedByUI(Mouse.RecordedConsolePosition);
+            shootTarget = Mouse.RecordedConsolePosition;
         }
 
         if (Time.Now - LastShot >= GetCurrentReloadTime() && shouldShoot)
         {
-            Vector2 velocity = shootPosition - Position;
-            velocity *= new Vector2(1f, 2f);
-            velocity = Vector2.Normalize(velocity);
-
-            Game.Connection.Send(new RPCMessage()
+            Vector2 direction = shootTarget - Position;
+            if (Time.Now - GotDoubleFireTime <= DoubleFireTime)
             {
-                ObjectId = NetworkId,
-                RPCId = 1,
-                Details = Utils.Serialize(writer =>
-                {
-                    writer.Write(Position);
-                    writer.Write(velocity);
-                })
-            });
-
-            if (Game.IsServer || Game.IsOffline)
-            {
-                Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity), Utils.Random)
-                {
-                    Position = Position,
-                });
-
-                velocity *= Projectile.Speed;
-                velocity *= new Vector2(1, 0.5f);
-
-                Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
-                {
-                    Position = Position,
-                    Velocity = velocity,
-                    SpawnedAt = Time.Now
-                });
+                Shoot(Utils.RotateVectorDeg(direction, -7f));
+                Shoot(Utils.RotateVectorDeg(direction, 7f));
             }
-
-            LastShot = Time.Now;
+            else
+            {
+                Shoot(direction);
+            }
         }
 
         SyncUp();
+    }
+
+    void UsePowerup(ItemType item)
+    {
+        switch (item)
+        {
+            case ItemType.RapidFire:
+                GotRapidFireTime = Time.Now;
+                break;
+            case ItemType.SuicideBomber:
+                DoesExist = false;
+
+                for (int i = 0; i < Game.Singleton.GameScene.Entities.Count; i++)
+                {
+                    Entity explodedEntity = Game.Singleton.GameScene.Entities[i];
+                    if (explodedEntity is IDamageable &&
+                        Vector2.Distance(Position, explodedEntity.Position) <= SelfDestructionDamageRadius)
+                    {
+                        explodedEntity.DoesExist = false;
+                    }
+                }
+
+                break;
+            case ItemType.DoubleFire:
+                GotDoubleFireTime = Time.Now;
+                break;
+            default:
+                break;
+        }
+    }
+
+    void Shoot(Vector2 direction)
+    {
+        Vector2 velocity = direction;
+        velocity *= new Vector2(1f, 2f);
+        velocity = Vector2.Normalize(velocity);
+        velocity *= Projectile.Speed;
+        velocity *= new Vector2(1, 0.5f);
+
+        Game.Connection.Send(new RPCMessage()
+        {
+            ObjectId = NetworkId,
+            RPCId = RPC_Shoot,
+            Details = Utils.Serialize(writer =>
+            {
+                writer.Write(Position);
+                writer.Write(velocity);
+            })
+        });
+
+        if (Game.IsServer || Game.IsOffline)
+        {
+            Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(Vector2.Normalize(velocity)), Utils.Random)
+            {
+                Position = Position,
+            });
+
+            Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
+            {
+                Position = Position,
+                Velocity = velocity,
+                SpawnedAt = Time.Now
+            });
+        }
+
+        LastShot = Time.Now;
     }
 
     public void Damage(float amount)
@@ -184,7 +214,7 @@ public class Player : NetworkEntity, IDamageable
             Game.Connection.Send(new RPCMessage()
             {
                 ObjectId = NetworkId,
-                RPCId = 2,
+                RPCId = RPC_Damage,
                 Details = Utils.Serialize(writer =>
                 {
                     writer.Write(amount);
@@ -230,9 +260,9 @@ public class Player : NetworkEntity, IDamageable
 
     float GetCurrentReloadTime()
     {
-        if (Time.Now - GetPowerUpTime < 5)
+        if (Time.Now - GotRapidFireTime < RapidFireTime)
         {
-            return .1f;
+            return RapidFireReload;
         }
 
         return ReloadTime;
@@ -265,31 +295,31 @@ public class Player : NetworkEntity, IDamageable
     {
         using MemoryStream stream = new(message.Details);
         using BinaryReader reader = new(stream);
-        if (message.RPCId == 1)
+
+        switch (message.RPCId)
         {
-            Vector2 projectilePosition = default;
-            projectilePosition = reader.ReadVector2();
-            Vector2 velocity = default;
-            velocity = reader.ReadVector2();
-
-            Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(velocity), Utils.Random)
+            case RPC_Shoot:
             {
-                Position = Position,
-            });
+                Vector2 projectilePosition = reader.ReadVector2();
+                Vector2 velocity = reader.ReadVector2();
 
-            velocity *= Projectile.Speed;
-            velocity *= new Vector2(1, 0.5f);
+                Game.Singleton.GameScene.SpawnEntity(new Particles(ParticleConfigs.GetShoot(Vector2.Normalize(velocity)), Utils.Random)
+                {
+                    Position = Position,
+                });
 
-            Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
-            {
-                Position = projectilePosition,
-                Velocity = velocity,
-                SpawnedAt = Time.Now
-            });
-        }
-        else if (message.RPCId == 2)
-        {
-            Damage(reader.ReadSingle());
+                Game.Singleton.GameScene.SpawnEntity(new Projectile(this)
+                {
+                    Position = projectilePosition,
+                    Velocity = velocity,
+                    SpawnedAt = Time.Now
+                });
+                break;
+            }
+
+            case RPC_Damage:
+                Damage(reader.ReadSingle());
+                break;
         }
 
         if (Game.IsServer)

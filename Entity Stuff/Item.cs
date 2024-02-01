@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Frozen;
+using System.Net;
 using YeahGame.Messages;
 
 namespace YeahGame;
@@ -7,12 +8,22 @@ public enum ItemType : byte
 {
     RapidFire,
     SuicideBomber,
+    DoubleFire,
 }
 
 public class Item : NetworkEntity
 {
-    public ItemType Type;
+    const bool ShouldMeMysterious = false;
 
+    public static readonly ItemType[] ItemTypes = Enum.GetValues<ItemType>();
+    public static readonly FrozenDictionary<ItemType, string> ItemNames = new Dictionary<ItemType, string>()
+    {
+        { ItemType.RapidFire, "Rapid Fire" },
+        { ItemType.SuicideBomber, "Suicide Bomber" },
+        { ItemType.DoubleFire, "Double Fire" },
+    }.ToFrozenDictionary();
+
+    public ItemType Type;
     public override EntityPrototype Prototype => EntityPrototype.Item;
 
     public Item()
@@ -24,16 +35,19 @@ public class Item : NetworkEntity
     {
         if (!Game.Renderer.IsVisible(Position)) return;
 
-        switch (Type)
+        if (ShouldMeMysterious || !Utils.IsDebug)
         {
-            case ItemType.RapidFire:
-                Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
-                break;
-            case ItemType.SuicideBomber:
-                Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
-                break;
-            default:
-                throw new NotImplementedException();
+            Game.Renderer[Position] = new ConsoleChar('?', CharColor.White);
+        }
+        else
+        {
+            Game.Renderer[Position] = Type switch
+            {
+                ItemType.RapidFire => new ConsoleChar('R', CharColor.White),
+                ItemType.SuicideBomber => new ConsoleChar('S', CharColor.White),
+                ItemType.DoubleFire => new ConsoleChar('D', CharColor.White),
+                _ => throw new NotImplementedException(),
+            };
         }
     }
 

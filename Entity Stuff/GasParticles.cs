@@ -13,14 +13,17 @@ public ref struct GasParticlesSpawnConfig
         Vector2 position = default;
         Vector2 velocity = InitialLocalDirection;
 
-        if (velocity == default) {
+        if (velocity == default)
+        {
             if (Spread != 0f)
             {
                 float spread = random.Next(Interval.GetFixed(Spread));
                 velocity.X = MathF.Cos(spread);
                 velocity.Y = MathF.Sin(spread);
             }
-        } else {
+        }
+        else
+        {
             if (Spread != 0f)
             {
                 float spread = random.Next(Interval.GetFixed(Spread));
@@ -94,7 +97,7 @@ public class GasParticles : Entity
 
             Coord pos = (Coord)(particle.LocalPosition + mapHalfSize);
             if (!map.IsVisible(pos)) continue;
-            
+
             float t = (Time.Now - particle.BornAt) / particle.LifeTime;
             if (t < 0f || t > 1f) continue;
 
