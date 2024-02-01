@@ -34,7 +34,16 @@ public class Player : NetworkEntity, IDamageable
     float LastNetPositionTime;
     CapturedTouch? CapturedTouch;
 
-    public byte Color => PlayerInfo is null ? CharColor.White : (byte)PlayerInfo.Color.Value;
+    public byte Color
+    {
+        get
+        {
+            if (PlayerInfo is null) return CharColor.White;
+            if (!Enum.IsDefined(PlayerInfo.Color.Value)) return CharColor.White;
+
+            return (byte)PlayerInfo.Color.Value;
+        }
+    }
 
     public UserDetails? PlayerInfo => Game.Connection.TryGetUserInfo(Owner, out ConnectionUserDetails info) ? info.Details : null;
 
@@ -261,7 +270,8 @@ public class Player : NetworkEntity, IDamageable
 
         if (info is not null)
         {
-            color = (byte)info.Color.Value;
+            if (!Enum.IsDefined(info.Color.Value)) color = CharColor.White;
+            else color = (byte)info.Color.Value;
 
             if (Vector2.Distance(Position, Mouse.RecordedConsolePosition) < UsernameHoverDistance)
             {
